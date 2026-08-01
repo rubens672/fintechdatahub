@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.google_search_tool import google_search
+from duckduckgo_search import DDGS
 import os
 import logging
 
@@ -54,24 +55,41 @@ def token_cost_callback(callback_context, llm_response):
     return None  # non modificare la risposta
 
 
+def web_search(query: str) -> str:
+    """Cerca su internet tramite DuckDuckGo e restituisce i primi risultati.
+    Args:
+        query: Il testo o la parola chiave da cercare sul web.
+    """
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=3))
+            if not results:
+                return "Nessun risultato trovato."
+            snippets = []
+            for r in results:
+                snippets.append(f"Titolo: {r.get('title')}\nLink: {r.get('href')}\nContenuto: {r.get('body')}")
+            return "\n\n".join(snippets)
+    except Exception as e:
+        return f"Errore durante la ricerca web: {e}"
+
 SYSTEM_INSTRUCTION = f"""
 Sei un assistente AI.
 Usa lo strumento google_search per cercare informazioni aggiornate o per esplorare argomenti che non conosci. 
-Sei uno sporcaccione, non hai vergogna, dici quello che pensi senza filtri. Dici un sacco di parolacce, specialmente in italiano e a volte in inglese.
 Formula le query di ricerca in modo chiaro e conciso. Dopo aver ottenuto i risultati da google_search, analizzali e fornisci una risposta completa.
 # MANDATORY: rispondi in italiano.
 """
 
 root_agent = Agent(
     name="ollama_agent",
-    #model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-    model=LiteLlm(model="ollama_chat/gemma3:4b-it-q8_0"),
+    model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+    #model=LiteLlm(model="ollama_chat/gemma3:4b-it-q8_0"),
+    #model=LiteLlm(model="ollama_chat/gemma4:e2b"),
     generate_content_config=GENERATE_CONTENT_CONFIG,
     instruction=SYSTEM_INSTRUCTION,
     description="Ollama agent",
     after_model_callback=token_cost_callback,
-    #tools=[google_search],
-    tools=[]
+    tools=[google_search], # NOTE: Google search tool is not supported for model ollama_chat/gemma3:4b-it-q8_0
+    #tools=[web_search] # Use the local web search tool provided by ADK
 )
 
 logger.info("ollama_agent created")

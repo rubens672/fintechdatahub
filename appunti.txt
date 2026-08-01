@@ -28,6 +28,7 @@ ollama list
 #Scaricarlo con 
 ollama pull gemma3
 ollama pull gemma3:4b-it-q8_0
+ollama pull gemma4:e2b *
 
 #Rimozione: Se occupa troppo spazio e vuoi cancellarlo:
 ollama rm mistral-small

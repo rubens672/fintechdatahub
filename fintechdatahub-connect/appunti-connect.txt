@@ -1,0 +1,6 @@
+| id | BIGSERIAL / BIGINT | Chiave primaria (in Java usi Long, ideale per dataset grandi). |
+| published_at | TIMESTAMP WITH TIME ZONE | Più preciso di date_time. Evita parole riservate SQL. |
+| title | VARCHAR(255) | fondamentale per le news. |
+| summary | VARCHAR(500) | Testo breve per le anteprime o i feed REST rapidi. |
+| content | TEXT | Per il corpo dell'articolo senza limiti rigidi di caratteri. |
+| source | VARCHAR(100) | (Opzionale) Utile per tracciare l'agenzia che ha emesso la news. |
