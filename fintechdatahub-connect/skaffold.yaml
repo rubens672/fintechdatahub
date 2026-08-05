@@ -1,0 +1,71 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: fintechdatahub-connect
+
+build:
+  artifacts:
+    - image: fintechdatahub-connect-rest
+      context: .
+      docker:
+        dockerfile: fintechdatahub-connect-rest/Dockerfile
+      sync:
+        manual:
+          - src: 'fintechdatahub-connect-rest/target/classes/**/*.class'
+            dest: '/app/BOOT-INF/classes'
+          - src: 'fintechdatahub-connect-rest/target/classes/**/*.yml'
+            dest: '/app/BOOT-INF/classes'
+    - image: fintechdatahub-connect-webapp
+      context: .
+      docker:
+        dockerfile: fintechdatahub-connect-webapp/Dockerfile
+      sync:
+        manual:
+          - src: 'fintechdatahub-connect-rest/target/classes/**/*.class'
+            dest: '/app/BOOT-INF/classes'
+          - src: 'fintechdatahub-connect-rest/target/classes/**/*.yml'
+            dest: '/app/BOOT-INF/classes'
+
+# Profilo Predefinito: Sviluppo Locale su Minikube
+manifests:
+  kustomize:
+    paths:
+      - k8s/overlays/local
+
+portForward:
+  - resourceType: service
+    resourceName: fintechdatahub-connect-webapp-service
+    port: 8080
+    localPort: 8080
+
+profiles:
+  # 1. Profilo Locale Minikube (esplicito) -> skaffold dev --profile=local
+  - name: local
+    build:
+      local:
+        push: false
+    manifests:
+      kustomize:
+        paths:
+          - k8s/overlays/local
+
+  # 2. Profilo GCP DEV (Cloud Deploy / GKE Dev)
+  - name: dev
+    manifests:
+      kustomize:
+        paths:
+          - k8s/overlays/dev
+
+  # 3. Profilo GCP TEST (Cloud Deploy / GKE Test)
+  - name: test
+    manifests:
+      kustomize:
+        paths:
+          - k8s/overlays/test
+
+  # 4. Profilo GCP PROD (Cloud Deploy / GKE Prod)
+  - name: prod
+    manifests:
+      kustomize:
+        paths:
+          - k8s/overlays/prod

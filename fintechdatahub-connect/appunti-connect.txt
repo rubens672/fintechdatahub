@@ -4,3 +4,105 @@
 | summary | VARCHAR(500) | Testo breve per le anteprime o i feed REST rapidi. |
 | content | TEXT | Per il corpo dell'articolo senza limiti rigidi di caratteri. |
 | source | VARCHAR(100) | (Opzionale) Utile per tracciare l'agenzia che ha emesso la news. |
+
+
+
+
+#prompt
+Agisci come un analista internazionale geopolitico. Cerca le notizie più importanti ed essenziali accadute nel mondo nella giornata di oggi.
+
+Restituisci i risultati formattando ciascuna notizia secondo la seguente struttura tabella/schema di dati:
+
+| Campo | Tipo / Formato | Descrizione |
+|---|---|---|
+| id | BIGSERIAL / BIGINT | Identificativo numerico progressivo univoco (es. 1, 2, 3...) |
+| published_at | TIMESTAMP WITH TIME ZONE | Data e ora di pubblicazione nel formato ISO 8601 con offset fuso orario (es. 2026-08-01T14:30:00+02:00) |
+| title | VARCHAR(255) | Titolo chiaro ed esaustivo della notizia (massimo 255 caratteri) |
+| summary | VARCHAR(500) | Sintesi breve per anteprima o feed REST rapido (massimo 500 caratteri) |
+| content | TEXT | Corpo completo dell'articolo con tutti i dettagli e il contesto della notizia |
+| source | VARCHAR(100) | Nome della fonte o agenzia di stampa (es. Reuters, ANSA, BBC, AP) |
+
+Requisiti aggiuntivi:
+- Estrai almeno 3-5 notizie di rilevanza globale.
+- Rispetta rigorosamente i limiti di caratteri indicati per i campi title e summary.
+- Mantieni un tono di scrittura neutro, giornalistico ed oggettivo.
+
+
+#installazioni
+#minikube
+curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+
+#kubectl
+sudo snap install kubectl --classic
+
+#skaffold
+# Scarica il binario di Skaffold per Linux (x86-64)
+curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64
+
+# Spostalo nella cartella degli eseguibili di sistema
+sudo install skaffold /usr/local/bin/
+
+# Rimuovi il file temporaneo    
+rm skaffold
+
+#verifica
+skaffold version
+
+
+#avvio minikube
+minikube start --driver=docker
+
+#verifica minikube
+minikube status
+
+#verifica 2
+kubectl get nodes
+
+#verifcia 3
+docker ps
+
+#verifica 4 Ui 
+minikube dashboard
+
+#stop minikube
+minikube stop
+
+#delete minikube
+minikube delete
+
+#rimuovi minikube
+minikube delete --all
+
+#profile locale
+skaffold dev --profile=local
+
+#Ogni volta che salvi un file, il ciclo predefinito fa:
+Ricompilazione Maven del JAR.  
+Rebuild dell'immagine Docker. 
+Distruzione del Pod su Minikube.  
+Creazione del nuovo Pod.  
+Avvio della JVM (i famosi $10\text{-}15$ secondi di "cold start" di Spring Boot).  
+
+#Aggiungi Spring Boot DevTools nel pom.xml dei moduli
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-devtools</artifactId>
+    <scope>runtime</scope>
+    <optional>true</optional>
+</dependency>
+
+#Configura 1 lo sync nel file skaffold.yaml
+sync:
+        auto: true # Skaffold rileva in automatico i file .class cambiati
+
+#Configura 2 lo Hot-Sync nel file skaffold.yaml
+sync:
+        manual:
+          - src: 'fintechdatahub-connect-rest/target/classes/**/*.class'
+            dest: '/app/BOOT-INF/classes'
+          - src: 'fintechdatahub-connect-rest/target/classes/**/*.yml'
+            dest: '/app/BOOT-INF/classes'
+
+# rimuovi porte occupate
+sudo fuser -k 8080/tcp

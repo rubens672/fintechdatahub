@@ -7,9 +7,9 @@ import os
 import logging
 
 try:
-    from .retry import GENERATE_CONTENT_CONFIG
+    from .retry import GENERATE_CONTENT_CONFIG, NewsItem
 except ImportError:
-    from retry import GENERATE_CONTENT_CONFIG
+    from retry import GENERATE_CONTENT_CONFIG, NewsItem
 
 load_dotenv()
 
@@ -58,13 +58,23 @@ def token_cost_callback(callback_context, llm_response):
 def web_search(query: str) -> str:
     """Cerca su internet tramite DuckDuckGo e restituisce i primi risultati.
     Args:
-        query: Il testo o la parola chiave da cercare sul web.
+        query: La parola chiave o frase di ricerca (es. 'geopolitica agosto 2026').
     """
     try:
         with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=3))
+            # 1° tentativo: ricerca con la query inviata dal modello
+            results = list(ddgs.text(query, max_results=5))
+            
+            # 2° tentativo (Fallback): se la ricerca esatta fallisce, pulisci la query
             if not results:
-                return "Nessun risultato trovato."
+                words = [w for w in query.split() if w.lower() not in ["notizie", "notizia", "ultime", "importanti", "della", "del", "di", "ed"]]
+                cleaned_query = " ".join(words).strip()
+                if cleaned_query and cleaned_query != query:
+                    results = list(ddgs.text(cleaned_query, max_results=5))
+
+            if not results:
+                return "Nessun risultato trovato sul web per la ricerca indicata."
+
             snippets = []
             for r in results:
                 snippets.append(f"Titolo: {r.get('title')}\nLink: {r.get('href')}\nContenuto: {r.get('body')}")
@@ -72,13 +82,52 @@ def web_search(query: str) -> str:
     except Exception as e:
         return f"Errore durante la ricerca web: {e}"
 
-SYSTEM_INSTRUCTION = f"""
-Sei un assistente AI.
-Usa lo strumento google_search per cercare informazioni aggiornate o per esplorare argomenti che non conosci. 
-Formula le query di ricerca in modo chiaro e conciso. Dopo aver ottenuto i risultati da google_search, analizzali e fornisci una risposta completa.
+SYSTEM_INSTRUCTION = """
+Agisci come un analista internazionale geopolitico e data entry specializzato.
+
+IL TUO COMPITO:
+Cerca e sintetizza le notizie più importanti ed essenziali di rilevanza globale accadute nel mondo.
+
+REGOLE RIGIDE SULL'ATTRIBUZIONE TEMPORALE E SULLE DATE:
+1. PRECISIONE DELLA DATA: Presta la massima attenzione all'attribuzione della data esatta di accadimento di ciascun evento. A causa della complessità della sintesi dei dati, eventi importanti che generano discussioni o sviluppi per più giorni rischiano a volte di essere posizionati in una data imprecisa rispetto al loro momento esatto di accadimento. EVITA TASSATIVAMENTE tale errore!
+2. COERENZA TEMPORALE: Assicurati che ogni notizia inserita nel JSON appartenga in modo rigoroso alla data esatta richiesta. Se un evento principale è accaduto in giorni diversi, evita di attribuirlo alla data errata e fornisci invece altre notizie rilevanti ed effettivamente accadute o battute in quella data esatta!
+3. SELEZIONE DATA:
+   - Se l'utente SPECIFICA una data nel messaggio (es. "1 agosto 2026"), filtra e seleziona esclusivamente notizie riferite a quella data esatta.
+   - Se l'utente NON specifica alcuna data, seleziona notizie riferite alla giornata odierna.
+
+REQUISITI DI ESTRAZIONE E CONTENUTO:
+1. Estrai almeno 3-5 notizie di rilevanza globale per la data o il periodo richiesto.
+2. Mantieni un tono di scrittura neutro, giornalistico ed oggettivo.
+3. Rispondi in lingua italiana.
+
+STRUTTURA DEI DATI E LIMITI (JSON):
+Restituisci i dati strutturati secondo i seguenti vincoli di campo per ciascuna notizia:
+- id: Identificativo numerico progressivo univoco (es. 1, 2, 3...).
+- published_at: Data e ora di pubblicazione della notizia nel formato ISO 8601 con offset fuso orario (es. YYYY-MM-DDTHH:MM:SS+02:00, rispecchiando esattamente la data indicata dall'utente o della notizia).
+- title: Titolo chiaro ed esaustivo della notizia (TASSATIVAMENTE massimo 255 caratteri).
+- summary: Sintesi breve per anteprima o feed REST rapido (TASSATIVAMENTE massimo 500 caratteri).
+- content: Corpo completo dell'articolo con tutti i dettagli e il contesto della notizia.
+- source: Nome della fonte o agenzia di stampa (es. Reuters, ANSA, BBC, AP).
+
+REGOLE RIGIDE SULL'OUTPUT:
+Restituisci l'output ESCLUSIVAMENTE come un blocco di codice JSON formattato in questo modo:
+```json
+[
+  {
+    "id": 1,
+    "published_at": "YYYY-MM-DDTHH:MM:SS+02:00",
+    "title": "Titolo...",
+    "summary": "Sintesi...",
+    "content": "Contenuto...",
+    "source": "Fonte..."
+  }
+]
+```
+Non inserire alcun testo introduttivo, salutare o conclusivo prima o dopo il blocco ```json.
 # MANDATORY: rispondi in italiano.
 """
 
+#il modello ha  contezza delle notizie fino a giugno 2024
 root_agent = Agent(
     name="ollama_agent",
     model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
@@ -88,8 +137,7 @@ root_agent = Agent(
     instruction=SYSTEM_INSTRUCTION,
     description="Ollama agent",
     after_model_callback=token_cost_callback,
-    tools=[google_search], # NOTE: Google search tool is not supported for model ollama_chat/gemma3:4b-it-q8_0
-    #tools=[web_search] # Use the local web search tool provided by ADK
+    # tools=[web_search], # Rimosso per risposte istantanee basate sul modello
 )
 
 logger.info("ollama_agent created")

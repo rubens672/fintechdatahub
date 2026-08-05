@@ -19,7 +19,11 @@ ollama run mistral-small3.2
 uv sync
 
 #run adk
-uv run adk web agents --allow_origins='*'
+uv run adk web agents --allow_origins='*' 
+uv run adk web agents --allow_origins='*' --reload_agents
+#per ricaricare sia il server FastAPI che gli agenti:
+uv run adk web agents --allow_origins='*' --reload --reload_agents
+
 
 
 #Verifica: Per vedere quali modelli hai già scaricato sul tuo PC:

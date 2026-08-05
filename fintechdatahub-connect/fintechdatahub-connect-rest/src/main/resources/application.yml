@@ -1,0 +1,10 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: fintechdatahub-connect-rest
+
+data:
+  file:
+    path: ${DATA_FILE_PATH:classpath:data/sample-data.json}

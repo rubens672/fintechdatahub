@@ -1,0 +1,5 @@
+# Ignora le modifiche ai file sorgente Java e configurazioni IDE
+**/src/main/java/
+.idea/
+*.iml
+.git/
