@@ -21,10 +21,13 @@ build:
         dockerfile: fintechdatahub-connect-webapp/Dockerfile
       sync:
         manual:
-          - src: 'fintechdatahub-connect-rest/target/classes/**/*.class'
+          - src: 'fintechdatahub-connect-webapp/target/classes/**/*.class'
             dest: '/app/BOOT-INF/classes'
-          - src: 'fintechdatahub-connect-rest/target/classes/**/*.yml'
+          - src: 'fintechdatahub-connect-webapp/target/classes/**/*.yml'
             dest: '/app/BOOT-INF/classes'
+  googleCloudBuild:
+    projectId: fintechdatahub-connect-75672
+    serviceAccount: projects/fintechdatahub-connect-75672/serviceAccounts/gke-node-sa@fintechdatahub-connect-75672.iam.gserviceaccount.com
 
 # Profilo Predefinito: Sviluppo Locale su Minikube
 manifests:
@@ -49,19 +52,19 @@ profiles:
         paths:
           - k8s/overlays/local
 
-  # 2. Profilo GCP DEV (Cloud Deploy / GKE Dev)
-  - name: dev
-    manifests:
-      kustomize:
-        paths:
-          - k8s/overlays/dev
-
-  # 3. Profilo GCP TEST (Cloud Deploy / GKE Test)
+  # 2. Profilo GCP TEST (Cloud Deploy / GKE Test)
   - name: test
     manifests:
       kustomize:
         paths:
           - k8s/overlays/test
+
+  # 3. Profilo GCP STAGING (Cloud Deploy / GKE Staging)
+  - name: staging
+    manifests:
+      kustomize:
+        paths:
+          - k8s/overlays/staging
 
   # 4. Profilo GCP PROD (Cloud Deploy / GKE Prod)
   - name: prod

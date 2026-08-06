@@ -84,7 +84,7 @@ Distruzione del Pod su Minikube.
 Creazione del nuovo Pod.  
 Avvio della JVM (i famosi $10\text{-}15$ secondi di "cold start" di Spring Boot).  
 
-#Aggiungi Spring Boot DevTools nel pom.xml dei moduli
+#Spring Boot DevTools nel pom.xml dei moduli
 <dependency>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-devtools</artifactId>
@@ -92,7 +92,7 @@ Avvio della JVM (i famosi $10\text{-}15$ secondi di "cold start" di Spring Boot)
     <optional>true</optional>
 </dependency>
 
-#Configura 1 lo sync nel file skaffold.yaml
+#Configura true lo sync nel file skaffold.yaml
 sync:
         auto: true # Skaffold rileva in automatico i file .class cambiati
 
@@ -106,3 +106,184 @@ sync:
 
 # rimuovi porte occupate
 sudo fuser -k 8080/tcp
+
+
+#Workflow del sistema DevOps
+[ Git Push / Commit ]
+        │
+        ▼
+ 🛠️  Cloud Build (cloudbuild.googleapis.com)
+     - Esegue Maven compile & Docker build
+        │
+        ▼
+ 📦  Artifact Registry (artifactregistry.googleapis.com)
+     - Conserva l'immagine Docker compilata
+        │
+        ▼
+ 🚀  Cloud Deploy (clouddeploy.googleapis.com)
+     - Esegue `skaffold render` e gestisce la pipeline nei vari ambienti (test -> staging -> prod)
+        │
+        ▼
+ ☸️   GKE (container.googleapis.com)
+     - I Pod scaricano l'immagine ed eseguono i microservizi sui cluster
+
+
+
+
+# Set variables
+export PROJECT_ID=$(gcloud config get-value project)
+export REGION="europe-west8"
+export ZONE="europe-west8-a"
+USER_EMAIL=$(gcloud config get-value account)
+SA_EMAIL="gke-node-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+
+# Crea il Service Account dedicato
+gcloud iam service-accounts create gke-node-sa \
+    --display-name="GKE Node Custom Service Account" \
+    --description="Service Account per i nodi GKE e Cloud Build"
+
+# Assegna i ruoli necessari
+# 1. Permesso base per i nodi GKE e sviluppatore Kubernetes per il Deploy
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/container.nodeServiceAccount"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/container.developer"
+
+# 2. Permesso di scrittura in Artifact Registry
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/artifactregistry.writer"
+
+# 3. Permessi per Cloud Build
+# 3a. Ruolo Builder a livello di progetto
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/cloudbuild.builds.builder"
+
+# 3b. Permesso diretto sul Bucket di Cloud Build
+gcloud storage buckets add-iam-policy-binding gs://${PROJECT_ID}_cloudbuild \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/storage.admin"
+
+# 4. Permesso di scrittura Log
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/logging.logWriter"
+
+# 5. Impersonazione: Consente a Cloud Build di impersonare il Service Account
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+
+gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
+    --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+    --role="roles/iam.serviceAccountUser"
+
+gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
+    --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-cloudbuild.iam.gserviceaccount.com" \
+    --role="roles/iam.serviceAccountUser"
+
+# 6. Assicurati che l'utente sviluppatore possa usare il Service Account
+gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
+    --member="user:$USER_EMAIL" \
+    --role="roles/iam.serviceAccountUser"
+
+#abilitare tutti i servizi necessari alla pipeline
+gcloud services enable \
+    container.googleapis.com \
+    artifactregistry.googleapis.com \
+    cloudbuild.googleapis.com \
+    clouddeploy.googleapis.com \
+    cloudresourcemanager.googleapis.com
+
+
+#Creazione Cluster GKE (Zonale = 1 nodo reale per minimizzare i costi)
+gcloud container clusters create test --zone=$ZONE --service-account=$SA_EMAIL --num-nodes=1  --async
+gcloud container clusters create staging --zone=$ZONE --service-account=$SA_EMAIL --num-nodes=1  --async
+gcloud container clusters create prod --zone=$ZONE --service-account=$SA_EMAIL --num-nodes=1  --async
+
+
+#Check lo status dei cluster
+gcloud container clusters list --format="csv(name,status)"
+
+
+#Creazione di Artifact Registry
+gcloud artifacts repositories create fdh-connect-registry \
+  --description="Image registry for fintechdatahub-connect" \
+  --repository-format=docker \
+  --location=$REGION
+
+
+#Procedura per Push da locale ( Skaffold per pubblicare su GCP)
+#configura docker per l'autenticazione ad Artifact Registry
+gcloud auth configure-docker ${REGION}-docker.pkg.dev
+# Skaffold per pubblicare su GCP
+skaffold run --default-repo=$REGION-docker.pkg.dev/$PROJECT_ID/fdh-connect-registry
+
+
+#Crea un Cloud Storage bucket per Cloud Build
+gsutil mb -p $PROJECT_ID gs://${PROJECT_ID}_cloudbuild
+
+
+#Per passare da un ambiente all'altro basta un unico comando per cambiare il contesto di kubectl:
+#Per Minikube: 
+kubectl config use-context minikube
+skaffold dev --profile=local
+#Per GCP GKE: 
+#per autenticazione gke
+sudo apt-get install google-cloud-cli-gke-gcloud-auth-plugin
+gcloud container clusters get-credentials test --zone=europe-west8-a
+
+
+#Build e deploy il container image su Artifact Registry
+skaffold build --interactive=false \
+--default-repo $REGION-docker.pkg.dev/$PROJECT_ID/fdh-connect-registry \
+--file-output artifacts.json
+
+#Crea la delivery-pipeline 
+gcloud deploy apply --file=clouddeploy-config/delivery-pipeline.yaml --region=$REGION
+
+#Creare la Release e avviare il Deploy
+gcloud deploy releases create release-004 \
+  --delivery-pipeline=fintechdatahub-connect \
+  --region=$REGION \
+  --build-artifacts=artifacts.json
+
+#Verificare l'IP Pubblico Assegnato
+kubectl get ingress fintechdatahub-connect-webapp-ingress -w
+
+
+
+
+#Comandi per la promozione delle release:
+
+### 1. Promozione da TEST a STAGING
+```bash
+gcloud deploy releases promote \
+  --release=release-004 \
+  --delivery-pipeline=fintechdatahub-connect \
+  --region=$REGION \
+  --to-target=staging
+```
+
+---
+
+### 2. Promozione da STAGING a PROD
+```bash
+gcloud deploy releases promote \
+  --release=release-004 \
+  --delivery-pipeline=fintechdatahub-connect \
+  --region=$REGION \
+  --to-target=prod
+```
+
+---
+
+### 3. Approvazione per PROD (se richiesta l'approvazione manuale)
+```bash
+gcloud deploy rollouts approve release-003-to-prod-0001 \
+  --release=release-004 \
+  --delivery-pipeline=fintechdatahub-connect \
+  --region=$REGION
+```

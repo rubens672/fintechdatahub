@@ -26,7 +26,7 @@ uv run adk web agents --allow_origins='*' --reload --reload_agents
 
 
 
-#Verifica: Per vedere quali modelli hai già scaricato sul tuo PC:
+#Verifica: Per vedere quali modelli hai già scaricato sul PC:
 ollama list
 
 #Scaricarlo con 

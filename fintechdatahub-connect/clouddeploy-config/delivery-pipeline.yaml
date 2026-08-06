@@ -1,0 +1,64 @@
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: deploy.cloud.google.com/v1
+kind: DeliveryPipeline
+metadata:
+  name: fintechdatahub-connect
+description: fintechdatahub-connect delivery pipeline
+serialPipeline:
+  stages:
+  - targetId: test
+  - targetId: staging
+  - targetId: prod
+---
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: test
+description: GKE Test Cluster
+gke:
+  cluster: projects/fintechdatahub-connect-75672/locations/europe-west8-a/clusters/test
+executionConfigs:
+- usages:
+  - RENDER
+  - DEPLOY
+  serviceAccount: gke-node-sa@fintechdatahub-connect-75672.iam.gserviceaccount.com
+---
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: staging
+description: GKE Staging Cluster
+gke:
+  cluster: projects/fintechdatahub-connect-75672/locations/europe-west8-a/clusters/staging
+executionConfigs:
+- usages:
+  - RENDER
+  - DEPLOY
+  serviceAccount: gke-node-sa@fintechdatahub-connect-75672.iam.gserviceaccount.com
+---
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: prod
+description: GKE Prod Cluster
+requireApproval: true
+gke:
+  cluster: projects/fintechdatahub-connect-75672/locations/europe-west8-a/clusters/prod
+executionConfigs:
+- usages:
+  - RENDER
+  - DEPLOY
+  serviceAccount: gke-node-sa@fintechdatahub-connect-75672.iam.gserviceaccount.com

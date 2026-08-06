@@ -1,0 +1,57 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: fintechdatahub-connect-webapp-backendconfig
+  namespace: default
+spec:
+  healthCheck:
+    requestPath: /  # Verifica ed eventualmente adatta il path per il controllo di integrità
+    port: 8080
+    type: HTTP
+    checkIntervalSec: 15
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    # Collega la porta del servizio al BackendConfig per l'health check
+    cloud.google.com/backend-config: '{"ports": {"8080": "fintechdatahub-connect-webapp-backendconfig"}}'
+    # Abilita il Container-Native Load Balancing (NEG)
+    cloud.google.com/neg: '{"ingress": true}'
+  labels:
+    app: fintechdatahub-connect-webapp
+  name: fintechdatahub-connect-webapp-service
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: fintechdatahub-connect-webapp
+  sessionAffinity: None
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fintechdatahub-connect-webapp-ingress
+  namespace: default
+  annotations:
+    # Indica a GKE di creare un External Application Load Balancer
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: fintechdatahub-connect-webapp-service
+            port:
+              number: 8080
