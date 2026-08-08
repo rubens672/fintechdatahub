@@ -4,7 +4,8 @@ kind: Kustomization
 namePrefix: prod-
 resources:
   - ../../base
-  - webapp-configmap.yaml
+  - hpa-webapp.yaml
+
 
 patches:
   - target:

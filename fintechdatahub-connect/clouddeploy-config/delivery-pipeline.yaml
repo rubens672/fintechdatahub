@@ -22,6 +22,17 @@ serialPipeline:
   - targetId: test
   - targetId: staging
   - targetId: prod
+    profiles: []
+    strategy:
+      canary:
+        runtimeConfig:
+          kubernetes:
+            serviceNetworking:
+              service: "fintechdatahub-connect-webapp-service"
+              deployment: "fintechdatahub-connect-webapp-deployment"
+        canaryDeployment:
+          percentages: [10, 30, 60]
+          verify: false
 ---
 apiVersion: deploy.cloud.google.com/v1
 kind: Target

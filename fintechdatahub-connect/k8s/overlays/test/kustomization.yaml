@@ -4,4 +4,4 @@ kind: Kustomization
 namePrefix: test-
 resources:
   - ../../base
-  - webapp-configmap.yaml
+

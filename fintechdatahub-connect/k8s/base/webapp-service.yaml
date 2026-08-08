@@ -4,13 +4,15 @@ metadata:
   name: fintechdatahub-connect-webapp-service
   labels:
     app: fintechdatahub-connect-webapp
+  annotations:
+    cloud.google.com/backend-config: '{"ports": {"8080": "fintechdatahub-connect-webapp-backendconfig"}}'
+    cloud.google.com/neg: '{"ingress": true}'
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
-    - port: 8080
+    - name: http
+      port: 8080
       targetPort: 8080
-      nodePort: 30080
       protocol: TCP
-      name: http
   selector:
     app: fintechdatahub-connect-webapp

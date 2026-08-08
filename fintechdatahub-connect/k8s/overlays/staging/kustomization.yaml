@@ -4,4 +4,4 @@ kind: Kustomization
 namePrefix: staging-
 resources:
   - ../../base
-  - webapp-configmap.yaml
+

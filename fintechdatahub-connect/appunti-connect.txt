@@ -134,8 +134,8 @@ sudo fuser -k 8080/tcp
 export PROJECT_ID=$(gcloud config get-value project)
 export REGION="europe-west8"
 export ZONE="europe-west8-a"
-USER_EMAIL=$(gcloud config get-value account)
-SA_EMAIL="gke-node-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+export USER_EMAIL=$(gcloud config get-value account)
+export SA_EMAIL="gke-node-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 
 # Crea il Service Account dedicato
 gcloud iam service-accounts create gke-node-sa \
@@ -208,6 +208,25 @@ gcloud container clusters create prod --zone=$ZONE --service-account=$SA_EMAIL -
 gcloud container clusters list --format="csv(name,status)"
 
 
+#Crea un contesto per ogni cluster
+CONTEXTS=("test" "staging" "prod")
+for CONTEXT in "${CONTEXTS[@]}"
+do   
+    gcloud container clusters get-credentials "${CONTEXT}" --zone "${ZONE}"
+    kubectl config rename-context "gke_${PROJECT_ID}_${ZONE}_${CONTEXT}" "${CONTEXT}"
+done
+
+# Cambiare contesto rapidamente
+kubectl config use-context test
+# Verificare i pod nei vari ambienti
+kubectl --context test get pods -n web-app
+kubectl --context staging get pods -n web-app
+kubectl --context prod get pods -n web-app
+
+# Rimuovi i vecchi deployment e servizi dal namespace default quando necessario
+kubectl delete deployment --all -n default
+kubectl delete service --all -n de
+
 #Creazione di Artifact Registry
 gcloud artifacts repositories create fdh-connect-registry \
   --description="Image registry for fintechdatahub-connect" \
@@ -225,6 +244,9 @@ skaffold run --default-repo=$REGION-docker.pkg.dev/$PROJECT_ID/fdh-connect-regis
 #Crea un Cloud Storage bucket per Cloud Build
 gsutil mb -p $PROJECT_ID gs://${PROJECT_ID}_cloudbuild
 
+#Crea un bucket Cloud Storage per Cloud Build per archiviare il file artifacts.json
+gcloud storage buckets create gs://$(gcloud config get-value project)-gceme-artifacts/
+
 
 #Per passare da un ambiente all'altro basta un unico comando per cambiare il contesto di kubectl:
 #Per Minikube: 
@@ -241,11 +263,16 @@ skaffold build --interactive=false \
 --default-repo $REGION-docker.pkg.dev/$PROJECT_ID/fdh-connect-registry \
 --file-output artifacts.json
 
-#Crea la delivery-pipeline 
+
+#Crea/Applica la delivery-pipeline 
 gcloud deploy apply --file=clouddeploy-config/delivery-pipeline.yaml --region=$REGION
 
+
+#Verifica i tre targets (test, staging, and prod) 
+gcloud beta deploy targets list --region=$REGION
+
 #Creare la Release e avviare il Deploy
-gcloud deploy releases create release-004 \
+gcloud deploy releases create release-001 \
   --delivery-pipeline=fintechdatahub-connect \
   --region=$REGION \
   --build-artifacts=artifacts.json
@@ -254,14 +281,12 @@ gcloud deploy releases create release-004 \
 kubectl get ingress fintechdatahub-connect-webapp-ingress -w
 
 
-
-
 #Comandi per la promozione delle release:
 
 ### 1. Promozione da TEST a STAGING
 ```bash
 gcloud deploy releases promote \
-  --release=release-004 \
+  --release=release-001 \
   --delivery-pipeline=fintechdatahub-connect \
   --region=$REGION \
   --to-target=staging
@@ -272,7 +297,7 @@ gcloud deploy releases promote \
 ### 2. Promozione da STAGING a PROD
 ```bash
 gcloud deploy releases promote \
-  --release=release-004 \
+  --release=release-001 \
   --delivery-pipeline=fintechdatahub-connect \
   --region=$REGION \
   --to-target=prod
@@ -282,8 +307,10 @@ gcloud deploy releases promote \
 
 ### 3. Approvazione per PROD (se richiesta l'approvazione manuale)
 ```bash
-gcloud deploy rollouts approve release-003-to-prod-0001 \
-  --release=release-004 \
+gcloud deploy rollouts approve release-001-to-prod-0001 \
+  --release=release-001 \
   --delivery-pipeline=fintechdatahub-connect \
   --region=$REGION
 ```
+
+
