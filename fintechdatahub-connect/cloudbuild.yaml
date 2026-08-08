@@ -1,5 +1,5 @@
 steps:
-  # 1. Maven Unit Tests (Verifica della qualità del codice Java)
+  # 1. Maven Unit Tests (Verifica della qualita' del codice Java)
   - name: 'maven:3.9-eclipse-temurin-17'
     id: 'maven-test'
     entrypoint: 'mvn'
