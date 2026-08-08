@@ -168,12 +168,17 @@ gcloud storage buckets add-iam-policy-binding gs://${PROJECT_ID}_cloudbuild \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/storage.admin"
 
-# 4. Permesso di scrittura Log
+# 4. Permesso di scrittura Log e Cloud Deploy Releaser
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/logging.logWriter"
 
-# 5. Impersonazione: Consente a Cloud Build di impersonare il Service Account
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/clouddeploy.releaser"
+
+
+# 5. Impersonazione: Consente a Cloud Build ed a se stesso di impersonare il Service Account
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
 
 gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
@@ -183,6 +188,11 @@ gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
 gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
     --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-cloudbuild.iam.gserviceaccount.com" \
     --role="roles/iam.serviceAccountUser"
+
+gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/iam.serviceAccountUser"
+
 
 # 6. Assicurati che l'utente sviluppatore possa usare il Service Account
 gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
@@ -241,11 +251,30 @@ gcloud auth configure-docker ${REGION}-docker.pkg.dev
 skaffold run --default-repo=$REGION-docker.pkg.dev/$PROJECT_ID/fdh-connect-registry
 
 
-#Crea un Cloud Storage bucket per Cloud Build
-gsutil mb -p $PROJECT_ID gs://${PROJECT_ID}_cloudbuild
+# Assegna ruoli IAM alla Compute Default SA per permettere a Cloud Build di accedere al bucket e ad Artifact Registry
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
 
-#Crea un bucket Cloud Storage per Cloud Build per archiviare il file artifacts.json
-gcloud storage buckets create gs://$(gcloud config get-value project)-gceme-artifacts/
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+    --role="roles/storage.admin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+    --role="roles/clouddeploy.releaser"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+    --role="roles/storage.admin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+    --role="roles/clouddeploy.releaser"
+
+
+#Crea i Cloud Storage bucket specificando la region europe-west8 (Evita la location di default US)
+gcloud storage buckets create gs://${PROJECT_ID}_cloudbuild --location=$REGION
+gcloud storage buckets create gs://${PROJECT_ID}-gceme-artifacts --location=$REGION
+
 
 
 #Per passare da un ambiente all'altro basta un unico comando per cambiare il contesto di kubectl:
@@ -312,5 +341,39 @@ gcloud deploy rollouts approve release-001-to-prod-0001 \
   --delivery-pipeline=fintechdatahub-connect \
   --region=$REGION
 ```
+
+---
+
+### Esecuzione Automatica CI/CD tramite Cloud Build
+
+#### 1. Avvio manuale di Cloud Build da CLI
+Per inviare la build a Cloud Build che eseguirà Maven test, Skaffold build e creerà la release in Cloud Deploy:
+```bash
+gcloud builds submit \
+  --region=$REGION \
+  --config=cloudbuild.yaml \
+  --substitutions=_REGION=$REGION
+
+```
+
+#### 2. Creazione del Cloud Build Trigger (per esecuzione automatica su Git Push)
+Per far scattare la build ed il deploy in automatico a ogni push sul branch `main`:
+```bash
+gcloud builds triggers create github \
+  --name="fintechdatahub-connect-trigger" \
+  --repo-name="fintechdatahub" \
+  --repo-owner="YOUR_GITHUB_USERNAME" \
+  --branch-pattern="^main$" \
+  --build-config="fintechdatahub-connect/cloudbuild.yaml" \
+  --region=$REGION
+```
+
+#### 3. Salvataggio e Persistenza di artifacts.json su GCP
+- **Durante la Build**: Il file `artifacts.json` viene salvato nel filesystem condiviso temporaneo `/workspace` del container di Cloud Build, permettendo allo Step 3 (`cloud-deploy-release`) di leggerlo direttamente dallo Step 2 (`skaffold-build`).
+- **Persistenza su Cloud Storage**: A fine build, grazie alla sezione `artifacts: objects:` di `cloudbuild.yaml`, il file viene salvato automaticamente in modo permanente nel bucket Cloud Storage:
+  `gs://${PROJECT_ID}_cloudbuild/builds/$BUILD_ID/artifacts.json`
+
+
+
 
 
