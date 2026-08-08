@@ -26,8 +26,10 @@ Il sistema si compone di due microservizi indipendenti:
 fintechdatahub-connect/
 ├── pom.xml                        # Maven Parent POM (Multi-modulo)
 ├── skaffold.yaml                  # Configurazione Skaffold (Profilo locale Hot-Sync e GCP CI/CD)
+├── cloudbuild.yaml                # Configurazione Google Cloud Build (Pipeline CI/CD automatizzata)
 ├── README.md                      # Documentazione aggiornata del progetto
 ├── artifacts.json                 # Registro degli artefatti compilati per Cloud Deploy
+
 ├── news-template.json             # Template sorgente dati di esempio
 ├── clouddeploy-config/            # Configurazione della Delivery Pipeline GCP Cloud Deploy
 │   └── delivery-pipeline.yaml     # Pipeline con 3 Target (test, staging, prod) e strategia Canary
@@ -109,7 +111,40 @@ Con **Skaffold**, le modifiche al codice sorgente (file `.class` e `.yml`) vengo
 
 ---
 
+## 🤖 Pipeline Automatizzata CI/CD (Google Cloud Build & Cloud Deploy)
+
+Il file [`cloudbuild.yaml`](file:///home/aberti/cloud-devops-labs/fintechdatahub/fintechdatahub-connect/cloudbuild.yaml) automatizza l'intero ciclo di vita del software:
+
+1. **Test Unitari Java**: Esegue `mvn test` sui moduli Spring Boot.
+2. **Containerization & Push**: Utilizza `skaffold build` per compilare le immagini Docker, pubblicarle su **Artifact Registry** (`europe-west8-docker.pkg.dev`) e produrre il registro `artifacts.json`.
+3. **Automazione Release Cloud Deploy**: Genera automaticamente la release su **Cloud Deploy** con formato data/ora italiano (`release-YYYYMMDD-HHMM`) attivando il deployment nel cluster GKE **Test**.
+4. **Persistenza su GCS**: Archivia il manifest `artifacts.json` sul bucket Cloud Storage `gs://${PROJECT_ID}_cloudbuild/builds/$BUILD_ID/artifacts.json`.
+
+### Esecuzione Manuale della Pipeline Cloud Build
+Dalla radice del repository:
+```bash
+gcloud builds submit \
+  --region=europe-west8 \
+  --config=fintechdatahub-connect/cloudbuild.yaml \
+  --substitutions=_REGION=europe-west8 .
+```
+
+### Trigger Automatico su Git Push
+Per avviare la pipeline ad ogni `git push` sul branch `main`:
+```bash
+gcloud builds triggers create github \
+  --name="fintechdatahub-connect-trigger" \
+  --repo-name="fintechdatahub" \
+  --repo-owner="rubens672" \
+  --branch-pattern="^main$" \
+  --build-config="fintechdatahub-connect/cloudbuild.yaml" \
+  --region=europe-west8
+```
+
+---
+
 ## ☁️ Deployment Enterprise su GCP (Cloud Deploy Pipeline)
+
 
 ### 1. Configurazione delle Variabili d'Ambiente
 ```bash

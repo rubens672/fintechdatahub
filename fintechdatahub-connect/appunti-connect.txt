@@ -347,14 +347,14 @@ gcloud deploy rollouts approve release-001-to-prod-0001 \
 ### Esecuzione Automatica CI/CD tramite Cloud Build
 
 #### 1. Avvio manuale di Cloud Build da CLI
-Per inviare la build a Cloud Build che eseguirà Maven test, Skaffold build e creerà la release in Cloud Deploy:
+Dalla radice del repository Git:
 ```bash
 gcloud builds submit \
   --region=$REGION \
-  --config=cloudbuild.yaml \
-  --substitutions=_REGION=$REGION
-
+  --config=fintechdatahub-connect/cloudbuild.yaml \
+  --substitutions=_REGION=$REGION .
 ```
+*(Nota: In `cloudbuild.yaml` ogni step utilizza `dir: 'fintechdatahub-connect'` per impostare nativamente la directory di lavoro sia quando scattato da Trigger Git che da CLI).*
 
 #### 2. Creazione del Cloud Build Trigger (per esecuzione automatica su Git Push)
 Per far scattare la build ed il deploy in automatico a ogni push sul branch `main`:
@@ -362,16 +362,17 @@ Per far scattare la build ed il deploy in automatico a ogni push sul branch `mai
 gcloud builds triggers create github \
   --name="fintechdatahub-connect-trigger" \
   --repo-name="fintechdatahub" \
-  --repo-owner="YOUR_GITHUB_USERNAME" \
+  --repo-owner="rubens672" \
   --branch-pattern="^main$" \
   --build-config="fintechdatahub-connect/cloudbuild.yaml" \
   --region=$REGION
 ```
 
 #### 3. Salvataggio e Persistenza di artifacts.json su GCP
-- **Durante la Build**: Il file `artifacts.json` viene salvato nel filesystem condiviso temporaneo `/workspace` del container di Cloud Build, permettendo allo Step 3 (`cloud-deploy-release`) di leggerlo direttamente dallo Step 2 (`skaffold-build`).
+- **Durante la Build**: Il file `artifacts.json` viene salvato nel filesystem condiviso temporaneo `/workspace/fintechdatahub-connect` del container di Cloud Build, permettendo allo Step 3 (`cloud-deploy-release`) di leggerlo direttamente dallo Step 2 (`skaffold-build`).
 - **Persistenza su Cloud Storage**: A fine build, grazie alla sezione `artifacts: objects:` di `cloudbuild.yaml`, il file viene salvato automaticamente in modo permanente nel bucket Cloud Storage:
   `gs://${PROJECT_ID}_cloudbuild/builds/$BUILD_ID/artifacts.json`
+
 
 
 
