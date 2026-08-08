@@ -4,6 +4,7 @@ steps:
     id: 'maven-test'
     entrypoint: 'mvn'
     args: ['test']
+    dir: 'fintechdatahub-connect'
 
   # 2. Skaffold Build & Push su Google Artifact Registry
   - name: 'gcr.io/k8s-skaffold/skaffold:latest'
@@ -14,8 +15,7 @@ steps:
       - '--file-output=artifacts.json'
       - '--default-repo=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}'
       - '--interactive=false'
-
-
+    dir: 'fintechdatahub-connect'
 
   # 3. Creazione Release e Trigger Deploy automatico su Google Cloud Deploy (Formato Data/Ora: release-YYYYMMDD-HHMM)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -25,13 +25,12 @@ steps:
       - '-c'
       - |
         RELEASE_NAME="release-$(TZ='Europe/Rome' date +'%Y%m%d-%H%M')"
-
         echo "Creazione release con nome: $${RELEASE_NAME}"
         gcloud deploy releases create "$${RELEASE_NAME}" \
           --delivery-pipeline=${_PIPELINE_NAME} \
           --region=${_REGION} \
           --build-artifacts=artifacts.json
-
+    dir: 'fintechdatahub-connect'
 
 # Utilizza il Service Account personalizzato dedicato
 serviceAccount: 'projects/${PROJECT_ID}/serviceAccounts/gke-node-sa@${PROJECT_ID}.iam.gserviceaccount.com'
@@ -46,9 +45,11 @@ artifacts:
   objects:
     location: 'gs://${PROJECT_ID}_cloudbuild/builds/$BUILD_ID'
     paths:
-      - 'artifacts.json'
+      - 'fintechdatahub-connect/artifacts.json'
 
 options:
   logging: CLOUD_LOGGING_ONLY
+
+
 
 
