@@ -5,3 +5,13 @@ namePrefix: staging-
 resources:
   - ../../base
 
+patches:
+  - target:
+      kind: Service
+      name: fintechdatahub-connect-webapp-service
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/cloud.google.com~1backend-config
+        value: '{"ports": {"8080": "staging-fintechdatahub-connect-webapp-backendconfig"}}'
+
+

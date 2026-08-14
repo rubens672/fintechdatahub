@@ -6,8 +6,14 @@ resources:
   - ../../base
   - hpa-webapp.yaml
 
-
 patches:
+  - target:
+      kind: Service
+      name: fintechdatahub-connect-webapp-service
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/cloud.google.com~1backend-config
+        value: '{"ports": {"8080": "prod-fintechdatahub-connect-webapp-backendconfig"}}'
   - target:
       kind: Deployment
       name: fintechdatahub-connect-rest-deployment
@@ -22,3 +28,4 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 2
+
