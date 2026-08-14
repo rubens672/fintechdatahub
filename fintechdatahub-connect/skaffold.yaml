@@ -64,7 +64,10 @@ profiles:
         container:
           name: curl-check
           image: curlimages/curl:latest
-          args: ["-f", "http://test-fintechdatahub-connect-webapp-service.web-app.svc.cluster.local:8080/"]
+          args: ["-f", "http://test-fintechdatahub-connect-webapp-service.web-app:8080/"]
+        executionMode:
+          kubernetesCluster:
+            overrides: '{"metadata": {"namespace": "web-app"}}'
 
   # 3. Profilo GCP STAGING (Cloud Deploy / GKE Staging)
   - name: staging
@@ -77,7 +80,10 @@ profiles:
         container:
           name: curl-check
           image: curlimages/curl:latest
-          args: ["-f", "http://staging-fintechdatahub-connect-webapp-service.web-app.svc.cluster.local:8080/"]
+          args: ["-f", "http://staging-fintechdatahub-connect-webapp-service.web-app:8080/"]
+        executionMode:
+          kubernetesCluster:
+            overrides: '{"metadata": {"namespace": "web-app"}}'
 
   # 4. Profilo GCP PROD (Cloud Deploy / GKE Prod)
   - name: prod
@@ -90,4 +96,7 @@ profiles:
         container:
           name: curl-check
           image: curlimages/curl:latest
-          args: ["-f", "http://prod-fintechdatahub-connect-webapp-service.web-app.svc.cluster.local:8080/"]
+          args: ["-f", "http://prod-fintechdatahub-connect-webapp-service.web-app:8080/"]
+        executionMode:
+          kubernetesCluster:
+            overrides: '{"metadata": {"namespace": "web-app"}}'
