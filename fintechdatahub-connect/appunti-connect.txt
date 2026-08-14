@@ -370,6 +370,31 @@ gcloud builds triggers create github \
 
 
 
+#Attività future
+#Attivare le certificati SSL/TLS automatici e gratuiti forniti da Google (HTTPS col lucchetto 🔒) su GKE.
+# 1. Definisci il certificato per il tuo dominio
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: fintech-ssl-cert
+spec:
+  domains:
+    - app.tuodominio.it
+---
+# 2. Lo agganci nell'Ingress tramite annotazione
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fintechdatahub-ingress
+  annotations:
+    networking.gke.io/managed-certificates: "fintech-ssl-cert"
+
+#Applicazione in Produzione Reale per gli utenti finali con HTTPS sicuro:
+1. Acquisti un dominio (es. fintechdatahub.com).
+2. Crei l'Ingress GKE ed ottieni l'IP pubblico.
+3. Crei il record DNS: app.fintechdatahub.com -> IP_PUBLICO_INGRESS.
+4. Applichi il ManagedCertificate per attivare HTTPS.
+
 
 
 
