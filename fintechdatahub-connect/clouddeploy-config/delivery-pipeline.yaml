@@ -21,8 +21,14 @@ serialPipeline:
   stages:
   - targetId: test
     profiles: ["test"]
+    strategy:
+      standard:
+        verify: true
   - targetId: staging
     profiles: ["staging"]
+    strategy:
+      standard:
+        verify: true
   - targetId: prod
     profiles: ["prod"]
     strategy:
