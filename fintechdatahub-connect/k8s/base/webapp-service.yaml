@@ -5,7 +5,6 @@ metadata:
   labels:
     app: fintechdatahub-connect-webapp
   annotations:
-    cloud.google.com/backend-config: '{"ports": {"8080": "fintechdatahub-connect-webapp-backendconfig"}}'
     cloud.google.com/neg: '{"ingress": true}'
 spec:
   type: ClusterIP

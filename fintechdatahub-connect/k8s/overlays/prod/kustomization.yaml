@@ -8,12 +8,12 @@ resources:
 
 patches:
   - target:
-      kind: Service
-      name: fintechdatahub-connect-webapp-service
+      kind: ConfigMap
+      name: webapp-configmap
     patch: |-
       - op: replace
-        path: /metadata/annotations/cloud.google.com~1backend-config
-        value: '{"ports": {"8080": "prod-fintechdatahub-connect-webapp-backendconfig"}}'
+        path: /data/REST_SERVICE_URL
+        value: "http://prod-fintechdatahub-connect-rest-service:8081/api/v1/data"
   - target:
       kind: Deployment
       name: fintechdatahub-connect-rest-deployment

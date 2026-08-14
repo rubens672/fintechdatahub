@@ -1,18 +1,3 @@
-apiVersion: cloud.google.com/v1
-kind: BackendConfig
-metadata:
-  name: fintechdatahub-connect-webapp-backendconfig
-  namespace: web-app
-spec:
-  healthCheck:
-    requestPath: /  # Verifica ed eventualmente adatta il path per il controllo di integrità
-    port: 8080
-    type: HTTP
-    checkIntervalSec: 15
-    timeoutSec: 5
-    healthyThreshold: 2
-    unhealthyThreshold: 3
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
