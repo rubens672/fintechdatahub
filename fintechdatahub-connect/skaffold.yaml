@@ -59,6 +59,12 @@ profiles:
       kustomize:
         paths:
           - k8s/overlays/test
+    verify:
+      - name: smoke-test-webapp
+        container:
+          name: curl-check
+          image: curlimages/curl:latest
+          args: ["-f", "http://test-fintechdatahub-connect-webapp-service.web-app.svc.cluster.local:8080/"]
 
   # 3. Profilo GCP STAGING (Cloud Deploy / GKE Staging)
   - name: staging
@@ -66,6 +72,12 @@ profiles:
       kustomize:
         paths:
           - k8s/overlays/staging
+    verify:
+      - name: smoke-test-webapp
+        container:
+          name: curl-check
+          image: curlimages/curl:latest
+          args: ["-f", "http://staging-fintechdatahub-connect-webapp-service.web-app.svc.cluster.local:8080/"]
 
   # 4. Profilo GCP PROD (Cloud Deploy / GKE Prod)
   - name: prod
@@ -73,3 +85,9 @@ profiles:
       kustomize:
         paths:
           - k8s/overlays/prod
+    verify:
+      - name: smoke-test-webapp
+        container:
+          name: curl-check
+          image: curlimages/curl:latest
+          args: ["-f", "http://prod-fintechdatahub-connect-webapp-service.web-app.svc.cluster.local:8080/"]
