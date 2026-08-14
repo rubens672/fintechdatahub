@@ -40,12 +40,12 @@ metadata:
   name: test
 description: GKE Test Cluster
 gke:
-  cluster: projects/fintechdatahub-connect-75672/locations/europe-west8-a/clusters/test
+  cluster: projects/still-nebula-505112-m8/locations/europe-west8-a/clusters/test
 executionConfigs:
 - usages:
   - RENDER
   - DEPLOY
-  serviceAccount: gke-node-sa@fintechdatahub-connect-75672.iam.gserviceaccount.com
+  serviceAccount: gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
 ---
 apiVersion: deploy.cloud.google.com/v1
 kind: Target
@@ -53,12 +53,12 @@ metadata:
   name: staging
 description: GKE Staging Cluster
 gke:
-  cluster: projects/fintechdatahub-connect-75672/locations/europe-west8-a/clusters/staging
+  cluster: projects/still-nebula-505112-m8/locations/europe-west8-a/clusters/staging
 executionConfigs:
 - usages:
   - RENDER
   - DEPLOY
-  serviceAccount: gke-node-sa@fintechdatahub-connect-75672.iam.gserviceaccount.com
+  serviceAccount: gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
 ---
 apiVersion: deploy.cloud.google.com/v1
 kind: Target
@@ -67,9 +67,9 @@ metadata:
 description: GKE Prod Cluster
 requireApproval: true
 gke:
-  cluster: projects/fintechdatahub-connect-75672/locations/europe-west8-a/clusters/prod
+  cluster: projects/still-nebula-505112-m8/locations/europe-west8-a/clusters/prod
 executionConfigs:
 - usages:
   - RENDER
   - DEPLOY
-  serviceAccount: gke-node-sa@fintechdatahub-connect-75672.iam.gserviceaccount.com
+  serviceAccount: gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com

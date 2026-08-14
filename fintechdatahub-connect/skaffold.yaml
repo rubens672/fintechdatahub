@@ -26,8 +26,9 @@ build:
           - src: 'fintechdatahub-connect-webapp/target/classes/**/*.yml'
             dest: '/app/BOOT-INF/classes'
   googleCloudBuild:
-    projectId: fintechdatahub-connect-75672
-    serviceAccount: projects/fintechdatahub-connect-75672/serviceAccounts/gke-node-sa@fintechdatahub-connect-75672.iam.gserviceaccount.com
+    projectId: still-nebula-505112-m8
+    bucket: still-nebula-505112-m8_cloudbuild
+    serviceAccount: projects/still-nebula-505112-m8/serviceAccounts/gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
     region: europe-west8
 
 # Profilo Predefinito: Sviluppo Locale su Minikube

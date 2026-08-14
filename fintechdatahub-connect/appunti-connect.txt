@@ -128,19 +128,38 @@ sudo fuser -k 8080/tcp
      - I Pod scaricano l'immagine ed eseguono i microservizi sui cluster
 
 
+#impostazione project
+gcloud config set project still-nebula-505112-m8
 
-
-# Set variables
-export PROJECT_ID=$(gcloud config get-value project)
-export REGION="europe-west8"
-export ZONE="europe-west8-a"
-export USER_EMAIL=$(gcloud config get-value account)
-export SA_EMAIL="gke-node-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 
 # Crea il Service Account dedicato
 gcloud iam service-accounts create gke-node-sa \
     --display-name="GKE Node Custom Service Account" \
     --description="Service Account per i nodi GKE e Cloud Build"
+
+
+# Set variables
+export PROJECT_ID=$(gcloud config get-value project)
+export PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+export REGION="europe-west8"
+export ZONE="europe-west8-a"
+export USER_EMAIL=$(gcloud config get-value account)
+export SA_EMAIL="gke-node-sa@${PROJECT_ID}.iam.gserviceaccount.com"
+
+
+#abilitare tutti i servizi necessari alla pipeline
+gcloud services enable \
+    container.googleapis.com \
+    artifactregistry.googleapis.com \
+    cloudbuild.googleapis.com \
+    clouddeploy.googleapis.com \
+    cloudresourcemanager.googleapis.com
+
+
+#Crea i Cloud Storage bucket specificando la region europe-west8 (Evita la location di default US)
+gcloud storage buckets create gs://${PROJECT_ID}_cloudbuild --location=$REGION
+gcloud storage buckets create gs://${PROJECT_ID}-gceme-artifacts --location=$REGION
+
 
 # Assegna i ruoli necessari
 # 1. Permesso base per i nodi GKE e sviluppatore Kubernetes per il Deploy
@@ -179,8 +198,6 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 
 # 5. Impersonazione: Consente a Cloud Build ed a se stesso di impersonare il Service Account
-PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
-
 gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
     --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
     --role="roles/iam.serviceAccountUser"
@@ -199,13 +216,16 @@ gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
     --member="user:$USER_EMAIL" \
     --role="roles/iam.serviceAccountUser"
 
-#abilitare tutti i servizi necessari alla pipeline
-gcloud services enable \
-    container.googleapis.com \
-    artifactregistry.googleapis.com \
-    cloudbuild.googleapis.com \
-    clouddeploy.googleapis.com \
-    cloudresourcemanager.googleapis.com
+
+# 7. Assegna ruoli IAM al Service Account dedicato (SA_EMAIL) anziché alla Compute Default SA
+# (Permette a SA_EMAIL di gestire Storage su tutto il progetto e agire come Cloud Deploy Job Runner)
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/storage.admin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/clouddeploy.jobRunner"
 
 
 #Creazione Cluster GKE (Zonale = 1 nodo reale per minimizzare i costi)
@@ -251,31 +271,6 @@ gcloud auth configure-docker ${REGION}-docker.pkg.dev
 skaffold run --default-repo=$REGION-docker.pkg.dev/$PROJECT_ID/fdh-connect-registry
 
 
-# Assegna ruoli IAM alla Compute Default SA per permettere a Cloud Build di accedere al bucket e ad Artifact Registry
-PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
-    --role="roles/storage.admin"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
-    --role="roles/clouddeploy.releaser"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
-    --role="roles/storage.admin"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
-    --role="roles/clouddeploy.releaser"
-
-
-#Crea i Cloud Storage bucket specificando la region europe-west8 (Evita la location di default US)
-gcloud storage buckets create gs://${PROJECT_ID}_cloudbuild --location=$REGION
-gcloud storage buckets create gs://${PROJECT_ID}-gceme-artifacts --location=$REGION
-
-
 
 #Per passare da un ambiente all'altro basta un unico comando per cambiare il contesto di kubectl:
 #Per Minikube: 
@@ -293,7 +288,7 @@ skaffold build --interactive=false \
 --file-output artifacts.json
 
 
-#Crea/Applica la delivery-pipeline 
+#Crea/Applica la delivery-pipeline su Cloud Deploy
 gcloud deploy apply --file=clouddeploy-config/delivery-pipeline.yaml --region=$REGION
 
 
