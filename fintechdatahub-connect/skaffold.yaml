@@ -27,7 +27,6 @@ build:
             dest: '/app/BOOT-INF/classes'
   googleCloudBuild:
     projectId: still-nebula-505112-m8
-    bucket: still-nebula-505112-m8_cloudbuild
     serviceAccount: projects/still-nebula-505112-m8/serviceAccounts/gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
     region: europe-west8
 
