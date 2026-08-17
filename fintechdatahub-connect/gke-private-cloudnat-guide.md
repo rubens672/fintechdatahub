@@ -82,6 +82,8 @@ export SA_EMAIL="gke-node-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 gcloud container clusters create test \
   --region=$REGION \
   --enable-private-nodes \
+  --enable-ip-alias \
+  --no-enable-master-authorized-networks \
   --master-ipv4-cidr=172.16.0.0/28 \
   --service-account=$SA_EMAIL \
   --num-nodes=1 \
@@ -96,6 +98,8 @@ gcloud container clusters create test \
 gcloud container clusters create staging \
   --region=$REGION \
   --enable-private-nodes \
+  --enable-ip-alias \
+  --no-enable-master-authorized-networks \
   --master-ipv4-cidr=172.16.0.16/28 \
   --service-account=$SA_EMAIL \
   --num-nodes=1 \
@@ -110,6 +114,8 @@ gcloud container clusters create staging \
 gcloud container clusters create prod \
   --region=$REGION \
   --enable-private-nodes \
+  --enable-ip-alias \
+  --no-enable-master-authorized-networks \
   --master-ipv4-cidr=172.16.0.32/28 \
   --service-account=$SA_EMAIL \
   --num-nodes=1 \

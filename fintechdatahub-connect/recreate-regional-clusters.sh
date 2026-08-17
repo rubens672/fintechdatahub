@@ -28,12 +28,12 @@ if ! gcloud compute routers nats describe nat-gateway-${REGION} --router=nat-rou
 fi
 
 echo "=== 3. Eliminazione dei vecchi cluster ==="
-gcloud container clusters delete test --region="${REGION}" --quiet --async || true
-gcloud container clusters delete staging --region="${REGION}" --quiet --async || true
-gcloud container clusters delete prod --region="${REGION}" --quiet --async || true
-gcloud container clusters delete test --zone="${ZONE}" --quiet --async || true
-gcloud container clusters delete staging --zone="${ZONE}" --quiet --async || true
-gcloud container clusters delete prod --zone="${ZONE}" --quiet --async || true
+gcloud container clusters delete test --region="${REGION}" --quiet --async 2>/dev/null || true
+gcloud container clusters delete staging --region="${REGION}" --quiet --async 2>/dev/null || true
+gcloud container clusters delete prod --region="${REGION}" --quiet --async 2>/dev/null || true
+gcloud container clusters delete test --zone="${ZONE}" --quiet --async 2>/dev/null || true
+gcloud container clusters delete staging --zone="${ZONE}" --quiet --async 2>/dev/null || true
+gcloud container clusters delete prod --zone="${ZONE}" --quiet --async 2>/dev/null || true
 
 echo "=== Attesa completamento cancellazione cluster... ==="
 while gcloud container clusters list --format="value(name)" | grep -E "test|staging|prod" > /dev/null 2>&1; do
@@ -46,6 +46,8 @@ echo "=== 4. Creazione dei nuovi cluster regionali PRIVATI (senza IP pubblici su
 gcloud container clusters create test \
   --region="${REGION}" \
   --enable-private-nodes \
+  --enable-ip-alias \
+  --no-enable-master-authorized-networks \
   --master-ipv4-cidr=172.16.0.0/28 \
   --service-account="${SA_EMAIL}" \
   --num-nodes=1 \
@@ -59,6 +61,8 @@ gcloud container clusters create test \
 gcloud container clusters create staging \
   --region="${REGION}" \
   --enable-private-nodes \
+  --enable-ip-alias \
+  --no-enable-master-authorized-networks \
   --master-ipv4-cidr=172.16.0.16/28 \
   --service-account="${SA_EMAIL}" \
   --num-nodes=1 \
@@ -72,6 +76,8 @@ gcloud container clusters create staging \
 gcloud container clusters create prod \
   --region="${REGION}" \
   --enable-private-nodes \
+  --enable-ip-alias \
+  --no-enable-master-authorized-networks \
   --master-ipv4-cidr=172.16.0.32/28 \
   --service-account="${SA_EMAIL}" \
   --num-nodes=1 \
@@ -101,10 +107,13 @@ CONTEXTS=("test" "staging" "prod")
 for CONTEXT in "${CONTEXTS[@]}"
 do   
     gcloud container clusters get-credentials "${CONTEXT}" --region "${REGION}"
-    kubectl config rename-context "gke_${PROJECT_ID}_${REGION}_${CONTEXT}" "${CONTEXT}" --force 2>/dev/null || true
+    kubectl config delete-context "${CONTEXT}" 2>/dev/null || true
+    kubectl config rename-context "gke_${PROJECT_ID}_${REGION}_${CONTEXT}" "${CONTEXT}" 2>/dev/null || true
 done
 
 echo "=== 6. Ri-applicazione configurazione Cloud Deploy ==="
+# Il NEG (Network Endpoint Group) viene attivato in automatico da GKE quando Cloud Deploy / Skaffold
+# distribuisce il manifesto k8s/base/webapp.yaml (grazie all'annotazione cloud.google.com/neg: '{"ingress": true}')
 gcloud deploy apply --file=clouddeploy.yaml --region="${REGION}"
 
 echo "=== Operazione completata con successo! ==="
