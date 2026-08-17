@@ -82,7 +82,7 @@ do
 done
 
 echo "=== 4. Ri-applicazione configurazione Cloud Deploy ==="
-gcloud deploy apply --file=clouddeploy-config/delivery-pipeline.yaml --region="${REGION}"
+gcloud deploy apply --file=clouddeploy.yaml --region="${REGION}"
 
 echo "=== Operazione completata con successo! ==="
 gcloud container clusters list --format="table(name,location,status,numNodes)"

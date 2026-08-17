@@ -197,13 +197,17 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --role="roles/clouddeploy.releaser"
 
 
-# 5. Impersonazione: Consente a Cloud Build ed a se stesso di impersonare il Service Account
+# 5. Impersonazione: Consente a Cloud Build, Cloud Deploy ed a se stesso di impersonare il Service Account
 gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
     --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
     --role="roles/iam.serviceAccountUser"
 
 gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
     --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-cloudbuild.iam.gserviceaccount.com" \
+    --role="roles/iam.serviceAccountUser"
+
+gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
+    --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-clouddeploy.iam.gserviceaccount.com" \
     --role="roles/iam.serviceAccountUser"
 
 gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
@@ -218,7 +222,7 @@ gcloud iam service-accounts add-iam-policy-binding $SA_EMAIL \
 
 
 # 7. Assegna ruoli IAM al Service Account dedicato (SA_EMAIL) anziché alla Compute Default SA
-# (Permette a SA_EMAIL di gestire Storage su tutto il progetto e agire come Cloud Deploy Job Runner)
+# (Permette a SA_EMAIL di gestire Storage su tutto il progetto e agire come Cloud Deploy Job Runner e Operator per Automazioni)
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/storage.admin"
@@ -226,6 +230,10 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/clouddeploy.jobRunner"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/clouddeploy.operator"
 
 
 # Creazione Cluster GKE Regionali (Control Plane su region europe-west8, nodi su zone europe-west8-a per ottimizzare le quote IP/SSD GCP)
@@ -293,8 +301,11 @@ skaffold build --interactive=false \
 --file-output artifacts.json
 
 
-#Crea/Applica la delivery-pipeline su Cloud Deploy
-gcloud deploy apply --file=clouddeploy-config/delivery-pipeline.yaml --region=$REGION
+#Crea/Applica la delivery-pipeline e le Automazioni su Cloud Deploy
+gcloud deploy apply --file=clouddeploy.yaml --region=$REGION
+
+#Verifica le Automazioni attive (TEST -> STAGING -> PROD, Canary Auto-advance, Rollback Auto-repair)
+gcloud deploy automations list --delivery-pipeline=fintechdatahub-connect --region=$REGION
 
 
 #Verifica i tre targets (test, staging, and prod) 
