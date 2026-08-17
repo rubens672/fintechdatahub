@@ -31,8 +31,8 @@ fintechdatahub-connect/
 ├── artifacts.json                 # Registro degli artefatti compilati per Cloud Deploy
 
 ├── news-template.json             # Template sorgente dati di esempio
-├── clouddeploy-config/            # Configurazione della Delivery Pipeline GCP Cloud Deploy
-│   └── delivery-pipeline.yaml     # Pipeline con 3 Target (test, staging, prod) e strategia Canary
+├── cloudbuild.yaml                 # Configurazione CI/CD Cloud Build
+├── clouddeploy.yaml                # Pipeline GCP Cloud Deploy con 3 Target (test, staging, prod) e strategia Canary
 ├── fintechdatahub-connect-rest/   # Modulo REST Service
 │   ├── Dockerfile                 # Multi-stage Dockerfile (JRE Alpine)
 │   ├── pom.xml
@@ -68,7 +68,7 @@ fintechdatahub-connect/
 ## ⚡ Caratteristiche di Produzione (PROD)
 
 - **🐤 Rollout Canary Progressivo**: 
-  Configurato in [`clouddeploy-config/delivery-pipeline.yaml`](file:///home/aberti/cloud-devops-labs/fintechdatahub/fintechdatahub-connect/clouddeploy-config/delivery-pipeline.yaml). La promozione verso `prod` distribuisce gradualmente il traffico sulla nuova release (**10% ➡️ 30% ➡️ 60% ➡️ 100%**) sfruttando Kubernetes Service Networking.
+  Configurato in [`clouddeploy.yaml`](file:///home/aberti/cloud-devops-labs/fintechdatahub/fintechdatahub-connect/clouddeploy.yaml). La promozione verso `prod` distribuisce gradualmente il traffico sulla nuova release (**10% ➡️ 30% ➡️ 60% ➡️ 100%**) sfruttando Kubernetes Service Networking.
 - **📊 Horizontal Pod Autoscaler (HPA)**:
   Definito in [`k8s/overlays/prod/hpa-webapp.yaml`](file:///home/aberti/cloud-devops-labs/fintechdatahub/fintechdatahub-connect/k8s/overlays/prod/hpa-webapp.yaml). Scala automaticamente il deployment webapp da **2 a 5 repliche** quando l'uso medio di CPU supera il **70%**.
 - **🖥️ GKE Cluster Autoscaler**:
@@ -163,7 +163,7 @@ skaffold build --interactive=false \
 
 ### 3. Applicazione della Delivery Pipeline
 ```bash
-gcloud deploy apply --file=clouddeploy-config/delivery-pipeline.yaml --region=$REGION
+gcloud deploy apply --file=clouddeploy.yaml --region=$REGION
 ```
 
 ### 4. Creazione della Release ed Avvio Deploy (su TEST)

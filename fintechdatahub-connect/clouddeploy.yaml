@@ -84,3 +84,48 @@ executionConfigs:
   - DEPLOY
   - VERIFY
   serviceAccount: gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
+---
+# 1. Automazione TEST -> STAGING
+apiVersion: deploy.cloud.google.com/v1
+kind: Automation
+metadata:
+  name: fintechdatahub-connect/auto-promote-to-staging
+description: Promozione automatica da TEST a STAGING dopo il successo delle verifiche
+serviceAccount: gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
+selector:
+  targets:
+  - id: test
+rules:
+- promoteReleaseRule:
+    id: promote-to-staging
+    destinationTargetId: staging
+---
+# 2. Automazione Avanzamento Canary in PROD (10% -> 30% -> 60% -> 100%)
+apiVersion: deploy.cloud.google.com/v1
+kind: Automation
+metadata:
+  name: fintechdatahub-connect/auto-advance-canary-prod
+description: Avanzamento automatico delle fasi Canary in PROD se le verifiche di ciascuna fase hanno successo
+serviceAccount: gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
+selector:
+  targets:
+  - id: prod
+rules:
+- advanceRolloutRule:
+    id: advance-canary-prod
+---
+# 3. Automazione Repair / Rollback automatico in PROD in caso di errore
+apiVersion: deploy.cloud.google.com/v1
+kind: Automation
+metadata:
+  name: fintechdatahub-connect/auto-repair-prod
+description: Rollback automatico alla release precedente in PROD se il rollout o le verifiche della fase falliscono
+serviceAccount: gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
+selector:
+  targets:
+  - id: prod
+rules:
+- repairRolloutRule:
+    id: repair-prod
+    repairPhases:
+    - rollback: {}
