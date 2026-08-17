@@ -64,7 +64,7 @@ profiles:
         container:
           name: curl-check
           image: curlimages/curl:latest
-          args: ["-f", "http://test-fintechdatahub-connect-webapp-service.web-app:8080/"]
+          args: ["-f", "http://fintechdatahub-connect-webapp-service.web-app:8080/"]
         executionMode:
           kubernetesCluster:
             overrides: '{"metadata": {"namespace": "web-app"}}'
@@ -80,7 +80,7 @@ profiles:
         container:
           name: curl-check
           image: curlimages/curl:latest
-          args: ["-f", "http://staging-fintechdatahub-connect-webapp-service.web-app:8080/"]
+          args: ["-f", "http://fintechdatahub-connect-webapp-service.web-app:8080/"]
         executionMode:
           kubernetesCluster:
             overrides: '{"metadata": {"namespace": "web-app"}}'
@@ -96,7 +96,7 @@ profiles:
         container:
           name: curl-check
           image: curlimages/curl:latest
-          args: ["-f", "http://prod-fintechdatahub-connect-webapp-service.web-app:8080/"]
+          args: ["-f", "http://fintechdatahub-connect-webapp-service.web-app:8080/"]
         executionMode:
           kubernetesCluster:
             overrides: '{"metadata": {"namespace": "web-app"}}'

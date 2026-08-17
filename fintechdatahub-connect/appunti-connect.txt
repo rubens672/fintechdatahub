@@ -228,27 +228,27 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --role="roles/clouddeploy.jobRunner"
 
 
-# Creazione Cluster GKE (tutti i cluster con dischi da 50GB per ottimizzare le quote SSD GCP e autoscaling dei nodi 1-2 o 1-3)
-gcloud container clusters create test --zone=$ZONE --service-account=$SA_EMAIL --num-nodes=1 --disk-size=50 --disk-type=pd-balanced --enable-autoscaling --min-nodes=1 --max-nodes=2 --async
-gcloud container clusters create staging --zone=$ZONE --service-account=$SA_EMAIL --num-nodes=1 --disk-size=50 --disk-type=pd-balanced --enable-autoscaling --min-nodes=1 --max-nodes=2 --async
-gcloud container clusters create prod --zone=$ZONE --service-account=$SA_EMAIL --num-nodes=1 --disk-size=50 --disk-type=pd-balanced --enable-autoscaling --min-nodes=1 --max-nodes=3 --async
+# Creazione Cluster GKE Regionali (Control Plane su region europe-west8, nodi su zone europe-west8-a per ottimizzare le quote IP/SSD GCP)
+gcloud container clusters create test --region=$REGION --node-locations=$ZONE --service-account=$SA_EMAIL --num-nodes=1 --disk-size=50 --disk-type=pd-balanced --enable-autoscaling --min-nodes=1 --max-nodes=2 --async
+gcloud container clusters create staging --region=$REGION --node-locations=$ZONE --service-account=$SA_EMAIL --num-nodes=1 --disk-size=50 --disk-type=pd-balanced --enable-autoscaling --min-nodes=1 --max-nodes=2 --async
+gcloud container clusters create prod --region=$REGION --node-locations=$ZONE --service-account=$SA_EMAIL --num-nodes=1 --disk-size=50 --disk-type=pd-balanced --enable-autoscaling --min-nodes=1 --max-nodes=3 --async
 
 # Se i cluster esistono già, abilita l'autoscaling dei nodi con:
-# gcloud container clusters update test --zone=$ZONE --enable-autoscaling --min-nodes=1 --max-nodes=2
-# gcloud container clusters update staging --zone=$ZONE --enable-autoscaling --min-nodes=1 --max-nodes=2
-# gcloud container clusters update prod --zone=$ZONE --enable-autoscaling --min-nodes=1 --max-nodes=3
+# gcloud container clusters update test --region=$REGION --enable-autoscaling --min-nodes=1 --max-nodes=2
+# gcloud container clusters update staging --region=$REGION --enable-autoscaling --min-nodes=1 --max-nodes=2
+# gcloud container clusters update prod --region=$REGION --enable-autoscaling --min-nodes=1 --max-nodes=3
 
 
 #Check lo status dei cluster
-gcloud container clusters list --format="csv(name,status)"
+gcloud container clusters list --format="csv(name,location,status)"
 
 
 #Crea un contesto per ogni cluster
 CONTEXTS=("test" "staging" "prod")
 for CONTEXT in "${CONTEXTS[@]}"
 do   
-    gcloud container clusters get-credentials "${CONTEXT}" --zone "${ZONE}"
-    kubectl config rename-context "gke_${PROJECT_ID}_${ZONE}_${CONTEXT}" "${CONTEXT}"
+    gcloud container clusters get-credentials "${CONTEXT}" --region "${REGION}"
+    kubectl config rename-context "gke_${PROJECT_ID}_${REGION}_${CONTEXT}" "${CONTEXT}"
 done
 
 # Cambiare contesto rapidamente
@@ -284,7 +284,7 @@ skaffold dev --profile=local
 #Per GCP GKE: 
 #per autenticazione gke
 sudo apt-get install google-cloud-cli-gke-gcloud-auth-plugin
-gcloud container clusters get-credentials test --zone=europe-west8-a
+gcloud container clusters get-credentials test --region=europe-west8
 
 
 #Build e deploy il container image su Artifact Registry
@@ -402,4 +402,30 @@ metadata:
 
 
 
+## Come abbassare la dimensione del disco in GKE
+# GKE non consente di ridimensionare i dischi di un Node Pool esistente "in-place", ma è possibile creare un nuovo Node Pool più piccolo e rimuovere quello vecchio senza interrompere i servizi:
+#1. Creare il nuovo Node Pool da 50 GB su staging:
+gcloud container node-pools create pool-50gb \
+    --cluster=staging \
+    --zone=europe-west8-a \
+    --machine-type=e2-medium \
+    --disk-size=50 \
+    --disk-type=pd-balanced \
+    --num-nodes=1 \
+    --enable-autoscaling --min-nodes=1 --max-nodes=2
 
+#controlla lo scattato del nuovo node-pool
+gcloud container node-pools describe pool-50gb \
+    --cluster=staging \
+    --zone=europe-west8-a \
+    --format="value(status)"
+
+#Verifica che lo status sia RUNNING prima di procedere
+gcloud container node-pools describe pool-50gb \
+    --cluster=staging \
+    --zone=europe-west8-a \
+    --format="value(status)"
+
+gcloud container node-pools delete default-pool \
+    --cluster=staging \
+    --zone=europe-west8-a

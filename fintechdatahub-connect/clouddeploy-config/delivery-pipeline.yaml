@@ -36,8 +36,8 @@ serialPipeline:
         runtimeConfig:
           kubernetes:
             serviceNetworking:
-              service: "prod-fintechdatahub-connect-webapp-service"
-              deployment: "prod-fintechdatahub-connect-webapp-deployment"
+              service: "fintechdatahub-connect-webapp-service"
+              deployment: "fintechdatahub-connect-webapp-deployment"
         canaryDeployment:
           percentages: [10, 30, 60]
           verify: true
@@ -48,7 +48,7 @@ metadata:
   name: test
 description: GKE Test Cluster
 gke:
-  cluster: projects/still-nebula-505112-m8/locations/europe-west8-a/clusters/test
+  cluster: projects/still-nebula-505112-m8/locations/europe-west8/clusters/test
 executionConfigs:
 - usages:
   - RENDER
@@ -62,7 +62,7 @@ metadata:
   name: staging
 description: GKE Staging Cluster
 gke:
-  cluster: projects/still-nebula-505112-m8/locations/europe-west8-a/clusters/staging
+  cluster: projects/still-nebula-505112-m8/locations/europe-west8/clusters/staging
 executionConfigs:
 - usages:
   - RENDER
@@ -77,7 +77,7 @@ metadata:
 description: GKE Prod Cluster
 requireApproval: true
 gke:
-  cluster: projects/still-nebula-505112-m8/locations/europe-west8-a/clusters/prod
+  cluster: projects/still-nebula-505112-m8/locations/europe-west8/clusters/prod
 executionConfigs:
 - usages:
   - RENDER

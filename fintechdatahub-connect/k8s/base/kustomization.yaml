@@ -3,10 +3,8 @@ kind: Kustomization
 namespace: web-app
 
 resources:
-  - rest-deployment.yaml
-  - rest-service.yaml
-  - webapp-deployment.yaml
-  - webapp-service.yaml
+  - rest.yaml
+  - webapp.yaml
   - ingress-setup.yaml
   - webapp-configmap.yaml
   - web-app-namespace.yaml
