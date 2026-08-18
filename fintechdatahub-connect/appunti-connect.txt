@@ -59,7 +59,7 @@ minikube status
 #verifica 2
 kubectl get nodes
 
-#verifcia 3
+#verifca 3
 docker ps
 
 #verifica 4 Ui 
@@ -74,7 +74,13 @@ minikube delete
 #rimuovi minikube
 minikube delete --all
 
-#profile locale
+#aggiorna la configurazione DNS all'interno del nodo Minikube impostando il server DNS di Google (8.8.8.8):
+minikube ssh "echo 'nameserver 8.8.8.8' | sudo tee /etc/resolv.conf"
+
+
+#profile locale minikube
+kubectl config get-contexts
+kubectl config use-context minikube
 skaffold dev --profile=local
 
 #Ogni volta che salvi un file, il ciclo predefinito fa:
@@ -440,3 +446,36 @@ gcloud container node-pools describe pool-50gb \
 gcloud container node-pools delete default-pool \
     --cluster=staging \
     --zone=europe-west8-a
+
+
+## Opzione Risparmio Costi GKE (Spegnimento e Riavvio Nodi)
+
+# ----------------------------------------------------
+# 1. SPEGNIMENTO (Porta a 0 i nodi per non pagare la Compute Engine)
+# ----------------------------------------------------
+export REGION="europe-west8"
+
+# Imposta min-nodes=0 per l'autoscaling
+gcloud container clusters update test --region=$REGION --enable-autoscaling --min-nodes=0 --max-nodes=2
+gcloud container clusters update staging --region=$REGION --enable-autoscaling --min-nodes=0 --max-nodes=2
+gcloud container clusters update prod --region=$REGION --enable-autoscaling --min-nodes=0 --max-nodes=3
+
+# Spegni le VM portando i nodi a 0
+gcloud container clusters resize test --region=$REGION --node-pool=default-pool --num-nodes=0 --quiet
+gcloud container clusters resize staging --region=$REGION --node-pool=default-pool --num-nodes=0 --quiet
+gcloud container clusters resize prod --region=$REGION --node-pool=default-pool --num-nodes=0 --quiet
+
+
+# ----------------------------------------------------
+# 2. RIAVVIO (Riaccendi i nodi quando devi lavorare)
+# ----------------------------------------------------
+# Riporta a 1 il numero minimo di nodi
+gcloud container clusters update test --region=$REGION --enable-autoscaling --min-nodes=1 --max-nodes=2
+gcloud container clusters update staging --region=$REGION --enable-autoscaling --min-nodes=1 --max-nodes=2
+gcloud container clusters update prod --region=$REGION --enable-autoscaling --min-nodes=1 --max-nodes=3
+
+# Riaccendi le VM ridimensionando a 1 nodo
+gcloud container clusters resize test --region=$REGION --node-pool=default-pool --num-nodes=1 --quiet
+gcloud container clusters resize staging --region=$REGION --node-pool=default-pool --num-nodes=1 --quiet
+gcloud container clusters resize prod --region=$REGION --node-pool=default-pool --num-nodes=1 --quiet
+

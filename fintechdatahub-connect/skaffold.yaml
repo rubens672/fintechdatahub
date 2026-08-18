@@ -39,12 +39,15 @@ manifests:
 portForward:
   - resourceType: service
     resourceName: fintechdatahub-connect-webapp-service
+    namespace: web-app
     port: 8080
     localPort: 8080
 
 profiles:
   # 1. Profilo Locale Minikube (esplicito) -> skaffold dev --profile=local
   - name: local
+    activation:
+      - kubeContext: minikube
     build:
       local:
         push: false
