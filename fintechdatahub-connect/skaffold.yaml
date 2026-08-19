@@ -69,9 +69,17 @@ profiles:
     verify:
       - name: smoke-test-webapp
         container:
-          name: curl-check
+          name: curl-check-webapp
           image: curlimages/curl:latest
           args: ["-f", "http://fintechdatahub-connect-webapp-service.web-app:8080/"]
+        executionMode:
+          kubernetesCluster:
+            overrides: '{"metadata": {"namespace": "web-app"}}'
+      - name: smoke-test-rest-api
+        container:
+          name: curl-check-rest
+          image: curlimages/curl:latest
+          args: ["-f", "http://fintechdatahub-connect-rest-service.web-app:8081/api/v1/data"]
         executionMode:
           kubernetesCluster:
             overrides: '{"metadata": {"namespace": "web-app"}}'
@@ -85,9 +93,17 @@ profiles:
     verify:
       - name: smoke-test-webapp
         container:
-          name: curl-check
+          name: curl-check-webapp
           image: curlimages/curl:latest
           args: ["-f", "http://fintechdatahub-connect-webapp-service.web-app:8080/"]
+        executionMode:
+          kubernetesCluster:
+            overrides: '{"metadata": {"namespace": "web-app"}}'
+      - name: smoke-test-rest-api
+        container:
+          name: curl-check-rest
+          image: curlimages/curl:latest
+          args: ["-f", "http://fintechdatahub-connect-rest-service.web-app:8081/api/v1/data"]
         executionMode:
           kubernetesCluster:
             overrides: '{"metadata": {"namespace": "web-app"}}'
@@ -101,9 +117,17 @@ profiles:
     verify:
       - name: smoke-test-webapp
         container:
-          name: curl-check
+          name: curl-check-webapp
           image: curlimages/curl:latest
           args: ["-f", "http://fintechdatahub-connect-webapp-service.web-app:8080/"]
+        executionMode:
+          kubernetesCluster:
+            overrides: '{"metadata": {"namespace": "web-app"}}'
+      - name: smoke-test-rest-api
+        container:
+          name: curl-check-rest
+          image: curlimages/curl:latest
+          args: ["-f", "http://fintechdatahub-connect-rest-service.web-app:8081/api/v1/data"]
         executionMode:
           kubernetesCluster:
             overrides: '{"metadata": {"namespace": "web-app"}}'

@@ -241,6 +241,10 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/clouddeploy.operator"
 
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/datastore.user"
+
 
 # Creazione Cluster GKE Regionali (Control Plane su region europe-west8, nodi su zone europe-west8-a per ottimizzare le quote IP/SSD GCP)
 gcloud container clusters create test --region=$REGION --node-locations=$ZONE --service-account=$SA_EMAIL --num-nodes=1 --disk-size=50 --disk-type=pd-balanced --enable-autoscaling --min-nodes=1 --max-nodes=2 --async
