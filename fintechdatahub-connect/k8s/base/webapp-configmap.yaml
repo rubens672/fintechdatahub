@@ -6,3 +6,4 @@ metadata:
     app: fintechdatahub-connect-webapp
 data:
   REST_SERVICE_URL: "http://fintechdatahub-connect-rest-service:8081/api/v1/data"
+  GCP_PROJECT_ID: "still-nebula-505112-m8"

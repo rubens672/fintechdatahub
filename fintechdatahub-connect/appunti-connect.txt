@@ -292,9 +292,14 @@ skaffold run --default-repo=$REGION-docker.pkg.dev/$PROJECT_ID/fdh-connect-regis
 
 
 #Per passare da un ambiente all'altro basta un unico comando per cambiare il contesto di kubectl:
+# Gestione Credenziali GCP per Minikube:
+# Skaffold genera automaticamente il secret gcp-credentials tramite Kustomize secretGenerator
+# in k8s/overlays/local/kustomization.yaml usando ~/.config/gcloud/application_default_credentials.json
+
 #Per Minikube: 
 kubectl config use-context minikube
 skaffold dev --profile=local
+
 #Per GCP GKE: 
 #per autenticazione gke
 sudo apt-get install google-cloud-cli-gke-gcloud-auth-plugin
