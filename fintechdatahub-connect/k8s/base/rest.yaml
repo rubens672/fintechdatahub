@@ -27,12 +27,6 @@ spec:
                 configMapKeyRef:
                   name: webapp-configmap
                   key: GCP_PROJECT_ID
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /var/secrets/google/gcp-credentials.json
-          volumeMounts:
-            - name: gcp-credentials-volume
-              mountPath: /var/secrets/google
-              readOnly: true
           resources:
             requests:
               memory: "256Mi"
@@ -40,10 +34,6 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
-      volumes:
-        - name: gcp-credentials-volume
-          secret:
-            secretName: gcp-credentials
 ---
 apiVersion: v1
 kind: Service

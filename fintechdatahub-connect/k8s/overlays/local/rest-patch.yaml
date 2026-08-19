@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fintechdatahub-connect-rest-deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: fintechdatahub-connect-rest
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/secrets/google/gcp-credentials.json
+          volumeMounts:
+            - name: gcp-credentials-volume
+              mountPath: /var/secrets/google
+              readOnly: true
+      volumes:
+        - name: gcp-credentials-volume
+          secret:
+            secretName: gcp-credentials
