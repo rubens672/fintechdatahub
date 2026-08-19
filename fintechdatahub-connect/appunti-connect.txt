@@ -280,6 +280,14 @@ kubectl --context prod get pods -n web-app
 kubectl delete deployment --all -n default
 kubectl delete service --all -n de
 
+
+#aggiunta del project id al configmap PROD cluster
+kubectl patch configmap webapp-configmap -n web-app \
+  --context gke_still-nebula-505112-m8_europe-west8_prod \
+  --type merge \
+  -p '{"data":{"GCP_PROJECT_ID":"still-nebula-505112-m8"}}'
+
+
 #Creazione di Artifact Registry
 gcloud artifacts repositories create fdh-connect-registry \
   --description="Image registry for fintechdatahub-connect" \
