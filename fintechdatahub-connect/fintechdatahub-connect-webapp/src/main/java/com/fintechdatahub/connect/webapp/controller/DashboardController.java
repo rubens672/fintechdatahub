@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2026 Berti AI & Cloud Architecture. All rights reserved.
+ */
 package com.fintechdatahub.connect.webapp.controller;
 
 import com.fintechdatahub.connect.webapp.dto.NewsItemDto;

@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2026 Berti AI & Cloud Architecture. All rights reserved.
+ */
 package com.fintechdatahub.connect.rest.repository;
 
 import com.fintechdatahub.connect.rest.model.NewsItem;
