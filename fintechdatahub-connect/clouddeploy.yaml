@@ -144,3 +144,35 @@ rules:
     id: repair-prod
     repairPhases:
     - rollback: {}
+---
+# 5. Automazione Repair / Rollback automatico in TEST in caso di errore
+apiVersion: deploy.cloud.google.com/v1
+kind: Automation
+metadata:
+  name: fintechdatahub-connect/auto-repair-test
+description: Rollback automatico alla release precedente in TEST se le verifiche falliscono
+serviceAccount: gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
+selector:
+  targets:
+  - id: test
+rules:
+- repairRolloutRule:
+    id: repair-test
+    repairPhases:
+    - rollback: {}
+---
+# 6. Automazione Repair / Rollback automatico in STAGING in caso di errore
+apiVersion: deploy.cloud.google.com/v1
+kind: Automation
+metadata:
+  name: fintechdatahub-connect/auto-repair-staging
+description: Rollback automatico alla release precedente in STAGING se le verifiche falliscono
+serviceAccount: gke-node-sa@still-nebula-505112-m8.iam.gserviceaccount.com
+selector:
+  targets:
+  - id: staging
+rules:
+- repairRolloutRule:
+    id: repair-staging
+    repairPhases:
+    - rollback: {}
