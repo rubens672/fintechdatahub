@@ -73,7 +73,7 @@ Proponiamo la seguente suddivisione ingegneristica tra **Moduli Completi** (Full
 ### 2.3 Elementi da Escludere Categoricamente (Blacklist di Sicurezza)
 
 Per prevenire incidenti di sicurezza o "rumore" nel repository target:
-1. **Segreti e Credenziali:** File `.env`, file JSON di service account Google Cloud (`*.json`), token API o chiavi private SSH.
+1. **Segreti, Token e Credenziali (Tolleranza Zero):** File `.env`, token Cloudflare Tunnel (il file `secret-cloudflare-tunnel.yaml` è categoricamente escluso e sostituito dal template sanitizzato `.example`), manifest Secret Kubernetes (`*secret*.yaml`), file JSON di credenziali (`*credentials*.json`, `credentials.json`), chiavi API o chiavi private SSH. Tutti i file in fase di sync sono sottoposti a deep content scan automatizzato.
 2. **Stato Terraform:** `terraform.tfstate`, `terraform.tfstate.backup`, `.terraform/`, `.terraform.lock.hcl`.
 3. **Artifact di compilazione e dipendenze:** `node_modules/`, `dist/`, `target/` (Maven), `__pycache__/`, `.pytest_cache/`, `.venv/`.
 4. **Laboratori e cartelle sperimentali legacy della root:**
