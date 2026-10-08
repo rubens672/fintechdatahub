@@ -164,7 +164,10 @@ flowchart TD
     E --> F["6. (Opzionale) Configurazione GitHub Actions per Auto-Sync"]
 ```
 
-### Prossimi Passi:
-1. **Verifica della Matrice dei Moduli con l'Utente:** Confermare la lista dei moduli da includere completi vs quelli da trasformare in stub con solo `README.md`.
-2. **Preparazione dello script `scripts/sync_to_fintechdatahub.sh`**.
-3. **Esecuzione del primo wipe e push sul remote `rubens672/fintechdatahub`**.
+### Stato di Avanzamento:
+- [x] **1. Approvazione Studio di Fattibilità & Matrice Moduli:** Convalidata con policy differenziata Full Code vs Stub.
+- [x] **2. Creazione Template Stub & README Istituzionali:** Generati in `scripts/stubs/` per tutti i 6 moduli protetti e per la root.
+- [x] **3. Creazione Script Idempotente:** Implementato e collaudato in `scripts/sync_to_fintechdatahub.sh` con filtri rsync e safety checks.
+- [x] **4. Esecuzione Dry-Run:** Validazione superata a zero errori (nessun secret, tfstate o file vietato rilevato).
+- [x] **5. Wipe & Push Iniziale:** Eseguito con successo su `rubens672/fintechdatahub` (branch `main`).
+- [x] **6. Pipeline GitHub Actions CI/CD (Opzione C):** Configurata in `.github/workflows/sync-fintechdatahub.yml` per la sincronizzazione continua automatica ad ogni `git push` su `main`.

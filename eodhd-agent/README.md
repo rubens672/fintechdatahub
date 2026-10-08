@@ -23,7 +23,7 @@ flowchart TD
     %% DEFINIZIONE NODI DEL DAG
     Step0["🌐 Step 0: Regime di Mercato & Macro<br/><small>(VIX, Curva 10Y-2Y, Fed Funds, Inflazione CPI)</small>"]
     Step1["🔍 Step 1: Screening Multi-Fattoriale & Top Funnel<br/><small>(Filtro Top 50 Candidati, Z-Score, Semaphore 5)</small>"]
-    
+
     subgraph FanOut ["Fan-Out Parallelo a Concorrenza Delimitata (Semaphore = 5)"]
         Step2["📑 Step 2: Catalizzatori & Hard Veto Forense<br/><small>(SEC EDGAR 10-K/Q, Form 4, Sorprese Utili)</small>"]
         Step3["📈 Step 3: Timing Tecnico & Volatilità<br/><small>(Wilder ATR-14, Rimbalzo S1 / Pullback EMA20)</small>"]
