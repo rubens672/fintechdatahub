@@ -3,9 +3,8 @@
 **Autore:** Antigravity AI Engineering Team  
 **Data:** 8 Ottobre 2026  
 **Stato:** Documento di Analisi, Valutazione Rischi & Piano Operativo di Sincronizzazione  
-**Destinazione File:** Root del Repository (`/STUDIO_FATTIBILITA_SYNC_FINTECHDATAHUB.md`)  
-**Repository Sorgente (Master/Dev):** `rubens672/antigravity-challenge-lab`  
-**Repository Destinazione (Showcase/Mirror):** `rubens672/fintechdatahub`
+**Repository Sorgente:** `rubens672/antigravity-challenge-lab` (branch: `main`)  
+**Repository Destinazione (Showcase/Mirror):** `rubens672/fintechdatahub` (branch: `main` unico)
 
 ---
 
@@ -149,7 +148,7 @@ Adottare un **approccio a due fasi (Dual-Phase Strategy)**:
 | **Leak di Segreti / File `.env` o State Terraform** | Media | Critico | Implementazione di un filtro esplicito "Allowlist-based" (vengono inclusi solo i percorsi autorizzati, non una blacklist) + controllo pre-push di sicurezza. |
 | **Sovrascrittura Involontaria del Repo Master** | Bassa | Catastrofico | Lo script di sync opera esclusivamente su una cartella clone temporanea dedicata e verifica che il remote target sia esplicitamente `fintechdatahub.git`. |
 | **Rottura di Link o Documentazione** | Media | Basso | Revisione dei link relativi nei `README.md` dei moduli stub affinché puntino correttamente alla documentazione di progettazione inclusa. |
-| **Divergenze di Branch (main vs master)** | Media | Basso | Lo script forza il targeting del branch `main` standardizzato. |
+| **Divergenze di Branch (Presenza di develop)** | Bassa | Basso | Il branch `develop` esiste ed opera unicamente ed internamente nel repository di sviluppo `antigravity-challenge-lab`. Nel repository target `fintechdatahub` viene tracciato e aggiornato esclusivamente il branch `main` unico. |
 
 ---
 
