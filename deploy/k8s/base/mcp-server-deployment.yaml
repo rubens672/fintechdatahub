@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: financial-mcp-server
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/name: financial-mcp-server
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: financial-mcp-server
+  template:
+    metadata:
+      labels:
+        app: financial-mcp-server
+    spec:
+      serviceAccountName: fintech-workload-sa
+      containers:
+      - name: app
+        image: europe-west1-docker.pkg.dev/fintech-data-hub-45513/fintech-apps/financial-mcp-server:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: fintech-platform-env
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1024Mi"
+        readinessProbe:
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: financial-mcp-server
+  namespace: fintech-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: financial-mcp-server
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http

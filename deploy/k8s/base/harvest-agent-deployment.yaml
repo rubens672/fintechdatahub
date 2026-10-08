@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alpha-harvest-agent
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/name: alpha-harvest-agent
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alpha-harvest-agent
+  template:
+    metadata:
+      labels:
+        app: alpha-harvest-agent
+    spec:
+      serviceAccountName: fintech-workload-sa
+      containers:
+      - name: app
+        image: europe-west1-docker.pkg.dev/fintech-data-hub-45513/fintech-apps/alpha-harvest-agent:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: fintech-platform-env
+        resources:
+          requests:
+            cpu: "150m"
+            memory: "384Mi"
+          limits:
+            cpu: "300m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alpha-harvest-agent
+  namespace: fintech-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: alpha-harvest-agent
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http

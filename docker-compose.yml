@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # ==============================================================================
+  # 1. Firestore Local Emulator (DISABILITATO: si usa l'istanza reale su GCP)
+  # ==============================================================================
+  # firestore-emulator:
+  #   image: spine3/firebase-emulator:latest
+  #   container_name: firestore-emulator
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - GCP_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+  #   volumes:
+  #     - ./firestore-data:/data
+  #   ports:
+  #     - "8080:8080" # Porta API Firestore
+  #     - "4000:4000" # Porta Web UI Emulator
+
+  # ==============================================================================
+  # 2. Financial Cockpit Web & FastAPI Backend (Admin / Pro - GCP Firestore Live)
+  # ==============================================================================
+  financial-cockpit-web:
+    build:
+      context: .
+      dockerfile: financial-cockpit-web/Dockerfile
+    container_name: financial-cockpit-web
+    env_file:
+      - .env
+    environment:
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - GCP_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - FIRESTORE_DATABASE=${FIRESTORE_DATABASE:-fintech-data-hub-fs}
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - PORT=8080
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    ports:
+      - "8001:8080"
+
+  # ==============================================================================
+  # 3. Financial User Web & FastAPI Read-Only Backend (Portal Utenti Finali)
+  # ==============================================================================
+  financial-user-web:
+    build:
+      context: .
+      dockerfile: financial-user-web/Dockerfile
+    container_name: financial-user-web
+    env_file:
+      - .env
+    environment:
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - GCP_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - FIRESTORE_DATABASE=${FIRESTORE_DATABASE:-fintech-data-hub-fs}
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - PORT=8080
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    ports:
+      - "8002:8080"
+
+  # ==============================================================================
+  # 4. AI Financial Copilot (Chainlit on Cloud Run)
+  # ==============================================================================
+  financial-chainlit-app:
+    build:
+      context: .
+      dockerfile: financial-chainlit-app/Dockerfile
+    container_name: financial-chainlit-app
+    env_file:
+      - .env
+    environment:
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - GCP_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - FIRESTORE_DATABASE=${FIRESTORE_DATABASE:-fintech-data-hub-fs}
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - PORT=8080
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    ports:
+      - "8000:8080"
+
+  # ==============================================================================
+  # 5. Standalone Custom Financial MCP Server (Streamable HTTP / Cloud Run)
+  # ==============================================================================
+  financial-mcp-server:
+    build:
+      context: .
+      dockerfile: financial-mcp-server/Dockerfile
+    container_name: financial-mcp-server
+    env_file:
+      - .env
+    environment:
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - GCP_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - FIRESTORE_DATABASE=${FIRESTORE_DATABASE:-fintech-data-hub-fs}
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - PORT=8080
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    ports:
+      - "8082:8080"
+
+  # ==============================================================================
+  # 6. Automated Trading Service (Java 21 / Spring Boot 3.3.4 / eToro Public API)
+  # ==============================================================================
+  financial-etoro-service:
+    build:
+      context: ./financial-etoro-service
+      dockerfile: Dockerfile
+    container_name: financial-etoro-service
+    env_file:
+      - .env
+    environment:
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-45513}
+      - GCP_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-45513}
+      - FIRESTORE_DATABASE=${FIRESTORE_DATABASE:-fintech-data-hub-fs}
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - PORT=8080
+      - ETORO_ACCOUNT_MODE=${ETORO_ACCOUNT_MODE:-demo}
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    ports:
+      - "8080:8080"
+
+  # ==============================================================================
+  # 7. SEC EDGAR Forensic Ingestion & RAG Microservice (FastAPI + Vertex AI)
+  # ==============================================================================
+  financial-edgar-app:
+    build:
+      context: .
+      dockerfile: financial-edgar-app/Dockerfile
+    container_name: financial-edgar-app
+    env_file:
+      - .env
+    environment:
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - GCP_PROJECT=${GOOGLE_CLOUD_PROJECT:-fintech-data-hub-75428}
+      - FIRESTORE_DATABASE=${FIRESTORE_DATABASE:-fintech-data-hub-fs}
+      - VERTEX_LOCATION=${VERTEX_LOCATION:-us-central1}
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - PORT=8080
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    ports:
+      - "8004:8080"

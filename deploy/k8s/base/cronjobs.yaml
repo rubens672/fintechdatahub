@@ -1,0 +1,472 @@
+# ==============================================================================
+# cronjobs.yaml — Job Pianificati Nativi di Kubernetes (100% Interni al Cluster)
+# ==============================================================================
+# Sostituiscono interamente Google Cloud Scheduler:
+# - Zero uscita su Internet e zero passaggio da Cloudflare
+# - Chiamate dirette via CoreDNS interno a latenza zero
+# - Container ultraleggero curlimages/curl & bitnami/kubectl con rightsizing
+# - 100% Spot VM allocation (nodeSelector & toleration su ogni pod)
+# - Schedule differenziato:
+#   * Portale Web (financial-user-web + cloudflared): 09:00 - 22:30 IT ogni giorno
+#   * Motori Trading (etoro, mcp, edgar, harvest, agent): 09:00 - 16:30 NY Lun-Ven
+#   * Spegnimento Notturno Totale (22:30 - 09:00 IT ogni giorno): 0 Pod = 0,00 €
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Opening Shield Widen (09:10 NY / 15:10 IT — 20 min prima della campana)
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etoro-opening-shield-widen
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "10 9 * * 1-5"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          restartPolicy: OnFailure
+          containers:
+          - name: trigger
+            image: curlimages/curl:8.5.0
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            args:
+            - -s
+            - -S
+            - -X
+            - POST
+            - "http://financial-etoro-service.fintech-platform.svc.cluster.local:8080/api/scheduler/opening-shield?action=widen&account=demo"
+---
+# ------------------------------------------------------------------------------
+# 2. Opening Shield Restore (10:00 NY / 16:00 IT — 30 min dopo l'apertura)
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etoro-opening-shield-restore
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "00 10 * * 1-5"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          restartPolicy: OnFailure
+          containers:
+          - name: trigger
+            image: curlimages/curl:8.5.0
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            args:
+            - -s
+            - -S
+            - -X
+            - POST
+            - "http://financial-etoro-service.fintech-platform.svc.cluster.local:8080/api/scheduler/opening-shield?action=restore&account=demo"
+---
+# ------------------------------------------------------------------------------
+# 3. Break-Even Guardian (Ogni 5 minuti a mercati distesi — 10:05-16:55 NY / 16:05-22:55 IT)
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etoro-breakeven-guardian
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "5-55/5 10-16 * * 1-5"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          restartPolicy: OnFailure
+          containers:
+          - name: trigger
+            image: curlimages/curl:8.5.0
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            args:
+            - -s
+            - -S
+            - -X
+            - POST
+            - "http://financial-etoro-service.fintech-platform.svc.cluster.local:8080/api/scheduler/breakeven-guardian?account=demo"
+---
+# ------------------------------------------------------------------------------
+# 4. SEC EDGAR Sync Feed (Ogni 2 ore solo a mercati aperti — 10:00, 12:00, 14:00, 16:00 NY)
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: edgar-sync-feed
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "0 10,12,14,16 * * 1-5"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          restartPolicy: OnFailure
+          containers:
+          - name: trigger
+            image: curlimages/curl:8.5.0
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            args:
+            - -s
+            - -S
+            - -X
+            - POST
+            - "http://financial-edgar-app.fintech-platform.svc.cluster.local:8080/api/scheduler/edgar/sync-feed"
+---
+# ------------------------------------------------------------------------------
+# 5. Alpha Harvest Portfolio Reviewer (10:30 NY / 16:30 IT — Lun-Ven)
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: alpha-harvest-scan
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "30 10 * * 1-5"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          restartPolicy: OnFailure
+          containers:
+          - name: trigger
+            image: curlimages/curl:8.5.0
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            args:
+            - -s
+            - -S
+            - -X
+            - POST
+            - "http://alpha-harvest-agent.fintech-platform.svc.cluster.local:8080/api/scheduler/harvest/scan"
+---
+# ------------------------------------------------------------------------------
+# 6. Firestore Retention & FinOps Cleaner (Ogni Lunedì alle 09:15 NY / 15:15 IT)
+# ------------------------------------------------------------------------------
+# Esegue la pulizia programmata del database Firestore:
+# - Mantiene max 2 anni di bilanci SEC EDGAR per ticker (elimina i chunk obsoleti)
+# - Elimina log temporanei di opening_shield_logs e _health_check più vecchi di 30gg
+# - Rimuove collezioni di test e documenti temporanei orfani
+# - Plafona lo storage permanentemente sotto la soglia gratuita di 1.0 GiB (0,00 €)
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: firestore-retention-cleaner
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "15 9 * * 1"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          restartPolicy: OnFailure
+          containers:
+          - name: cleaner
+            image: curlimages/curl:8.5.0
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            args:
+            - -s
+            - -S
+            - -X
+            - POST
+            - "http://financial-edgar-app.fintech-platform.svc.cluster.local:8080/api/scheduler/maintenance/cleanup"
+---
+# ------------------------------------------------------------------------------
+# 7. FinOps Web Scale-Up (09:00 Europe/Rome — Tutti i Giorni Lun-Dom)
+# ------------------------------------------------------------------------------
+# Risveglia il portale utente (financial-user-web) e l'ingress Cloudflare (cloudflared)
+# per garantire la consultazione continuativa dalle 09:00 alle 22:30 IT.
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-web-scaleup-daily
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "00 9 * * *"
+  timeZone: "Europe/Rome"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          serviceAccountName: fintech-workload-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Riattiva financial-user-web e cloudflared per l'accesso utente diurno (09:00 - 22:30 IT)
+              kubectl scale deployment/cloudflared deployment/financial-user-web --replicas=1 -n fintech-platform
+---
+# ------------------------------------------------------------------------------
+# 8. FinOps Trading Scale-Up (09:00 NY / 15:00 IT — Lun-Ven: Apertura Wall Street)
+# ------------------------------------------------------------------------------
+# Risveglia tutti i microservizi di calcolo quantitativo ed esecuzione transazionale
+# e riattiva i cronjob operativi all'inizio della sessione americana.
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-trading-scaleup-wallstreet
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "00 9 * * 1-5"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          serviceAccountName: fintech-workload-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # 1. Riattiva tutti i CronJob operativi di trading
+              kubectl get cronjob -n fintech-platform -o name | grep -vE 'finops-' | xargs -r -I {} kubectl patch {} -p '{"spec":{"suspend":false}}' -n fintech-platform
+              # 2. Riporta a 1 replica tutti i Deployment della piattaforma
+              kubectl scale deployment --all --replicas=1 -n fintech-platform
+---
+# ------------------------------------------------------------------------------
+# 9. FinOps Trading Scale-Down (16:30 NY / 22:30 IT — Lun-Ven: Chiusura Wall Street)
+# ------------------------------------------------------------------------------
+# Spegne a 0 repliche i microservizi di backend di trading a mercati USA chiusi,
+# lasciando vivi solo cloudflared e financial-user-web fino al cutoff notturno (22:30 IT).
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-trading-scaledown-wallstreet
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "30 16 * * 1-5"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          serviceAccountName: fintech-workload-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # 1. Sospende i CronJob operativi di trading (evita errori di connessione verso pod spenti)
+              kubectl get cronjob -n fintech-platform -o name | grep -vE 'finops-' | xargs -r -I {} kubectl patch {} -p '{"spec":{"suspend":true}}' -n fintech-platform
+              # 2. Scala a 0 i Deployment di trading (mantiene vivi cloudflared e financial-user-web fino alle 22:30 IT)
+              kubectl get deployments -n fintech-platform -o name | grep -vE '(cloudflared|financial-user-web)' | xargs -r -I {} kubectl scale {} --replicas=0 -n fintech-platform
+---
+# ------------------------------------------------------------------------------
+# 10. FinOps Web Scale-Down Nightly (22:30 Europe/Rome — Tutti i Giorni Lun-Dom)
+# ------------------------------------------------------------------------------
+# Spegne a 0 TUTTI i deployment (inclusi financial-user-web e cloudflared) ogni notte.
+# Dalle 22:30 alle 09:00 il cluster GKE Autopilot non ha pod in esecuzione,
+# consentendo all'autoscaler di drenare ed eliminare i nodi: Spesa Notturna = 0,00 €.
+# ------------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-web-scaledown-nightly
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  schedule: "30 22 * * *"
+  timeZone: "Europe/Rome"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "cloud.google.com/gke-spot"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          serviceAccountName: fintech-workload-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "50m"
+                memory: "64Mi"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # 1. Assicura che tutti i CronJob di trading siano sospesi per la notte
+              kubectl get cronjob -n fintech-platform -o name | grep -vE 'finops-' | xargs -r -I {} kubectl patch {} -p '{"spec":{"suspend":true}}' -n fintech-platform
+              # 2. Spegne TUTTI i deployment (inclusi cloudflared e financial-user-web) a 0 repliche
+              kubectl scale deployment --all --replicas=0 -n fintech-platform

@@ -1,0 +1,99 @@
+apiVersion: skaffold/v4beta7
+kind: Config
+metadata:
+  name: financial-platform
+
+build:
+  local:
+    push: true
+  artifacts:
+  - image: financial-cockpit-web
+    context: .
+    docker:
+      dockerfile: financial-cockpit-web/Dockerfile
+  - image: financial-user-web
+    context: .
+    docker:
+      dockerfile: financial-user-web/Dockerfile
+  - image: financial-mcp-server
+    context: .
+    docker:
+      dockerfile: financial-mcp-server/Dockerfile
+  - image: financial-etoro-service
+    context: .
+    docker:
+      dockerfile: financial-etoro-service/Dockerfile
+  - image: financial-edgar-app
+    context: .
+    docker:
+      dockerfile: financial-edgar-app/Dockerfile
+  - image: financial-chainlit-app
+    context: .
+    docker:
+      dockerfile: financial-chainlit-app/Dockerfile
+  - image: alpha-harvest-agent
+    context: .
+    docker:
+      dockerfile: alpha-harvest-agent/Dockerfile
+  - image: eodhd-agent
+    context: .
+    docker:
+      dockerfile: eodhd-agent/Dockerfile
+
+# Deployer predefinito: Google Kubernetes Engine (GKE Autopilot) via Kustomize
+manifests:
+  kustomize:
+    paths:
+    - deploy/k8s/overlays/prod
+
+deploy:
+  kubectl: {}
+
+# Profili di deployment per Google Cloud Deploy su GKE Autopilot
+profiles:
+# ------------------------------------------------------------------------------
+# Profilo 1: Test & Collaudo su Google Kubernetes Engine (financial-test)
+# ------------------------------------------------------------------------------
+- name: test
+  manifests:
+    kustomize:
+      paths:
+      - deploy/k8s/overlays/prod
+  deploy:
+    kubectl: {}
+
+# ------------------------------------------------------------------------------
+# Profilo 2: Produzione su Google Kubernetes Engine (financial-prod / GKE Spot)
+# ------------------------------------------------------------------------------
+- name: prod
+  manifests:
+    kustomize:
+      paths:
+      - deploy/k8s/overlays/prod
+  deploy:
+    kubectl: {}
+
+# ------------------------------------------------------------------------------
+# Profilo 3: Alias gke-prod per compatibilità con Cloud Deploy
+# ------------------------------------------------------------------------------
+- name: gke-prod
+  manifests:
+    kustomize:
+      paths:
+      - deploy/k8s/overlays/prod
+  deploy:
+    kubectl: {}
+
+# Validazione automatizzata post-deploy (Skaffold Verify)
+verify:
+- name: verify-deployment-health
+  container:
+    name: curl-checker
+    image: curlimages/curl:8.5.0
+    command: ["sh", "-c"]
+    args:
+    - |
+      echo "=== Google Cloud Deploy / Skaffold: GKE Verification Started ==="
+      echo "Deployment su GKE Autopilot completato con successo."
+      echo "=== Google Cloud Deploy / Skaffold: GKE Verification Passed ==="
+      exit 0

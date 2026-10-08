@@ -1,0 +1,14 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--file=financial-etoro-service/Dockerfile'
+      - '--tag=europe-west1-docker.pkg.dev/fintech-data-hub-45513/fintech-apps/financial-etoro-service:latest'
+      - '--cache-from=europe-west1-docker.pkg.dev/fintech-data-hub-45513/fintech-apps/financial-etoro-service:latest'
+      - '--build-arg=BUILDKIT_INLINE_CACHE=1'
+      - '.'
+images:
+  - 'europe-west1-docker.pkg.dev/fintech-data-hub-45513/fintech-apps/financial-etoro-service:latest'
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,59 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: financial-user-web-test
+  labels:
+    app: financial-user-web
+    env: test
+    tier: web
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/cpu-throttling: "true"
+    spec:
+      serviceAccountName: cloudrun-sa@fintech-data-hub-45513.iam.gserviceaccount.com
+      timeoutSeconds: 300
+      containerConcurrency: 100
+      containers:
+      - image: financial-user-web
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        env:
+        - name: GOOGLE_CLOUD_PROJECT
+          value: fintech-data-hub-45513
+        - name: GCP_PROJECT
+          value: fintech-data-hub-45513
+        - name: FIRESTORE_DATABASE
+          value: fintech-data-hub-fs
+        - name: GOOGLE_CLOUD_LOCATION
+          value: europe-west1
+        - name: GOOGLE_GENAI_USE_VERTEXAI
+          value: "true"
+        - name: GEMINI_MODEL
+          value: gemini-3.6-flash
+        - name: MODEL
+          value: gemini-3.6-flash
+        - name: ETORO_ACCOUNT_MODE
+          value: demo
+        - name: ETORO_CLIENT_URL
+          value: https://financial-etoro-service-zvamf4lz7a-ew.a.run.app
+        - name: ETORO_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: etoro-public-key
+              key: latest
+        - name: ETORO_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: etoro-private-key
+              key: latest

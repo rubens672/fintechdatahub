@@ -1,0 +1,50 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: financial-etoro-service
+  labels:
+    app: financial-etoro-service
+    env: production
+    tier: broker
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      serviceAccountName: cloudrun-sa@fintech-data-hub-45513.iam.gserviceaccount.com
+      timeoutSeconds: 300
+      containerConcurrency: 80
+      containers:
+      - image: financial-etoro-service
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        env:
+        - name: GOOGLE_CLOUD_PROJECT
+          value: fintech-data-hub-45513
+        - name: GCP_PROJECT
+          value: fintech-data-hub-45513
+        - name: FIRESTORE_DATABASE
+          value: fintech-data-hub-fs
+        - name: ETORO_ACCOUNT_MODE
+          value: demo
+        - name: SPRING_PROFILES_ACTIVE
+          value: prod
+        - name: ETORO_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: etoro-public-key
+              key: latest
+        - name: ETORO_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: etoro-private-key
+              key: latest

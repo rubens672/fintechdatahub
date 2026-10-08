@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: financial-edgar-app
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/name: financial-edgar-app
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: financial-edgar-app
+  template:
+    metadata:
+      labels:
+        app: financial-edgar-app
+    spec:
+      serviceAccountName: fintech-workload-sa
+      containers:
+      - name: app
+        image: europe-west1-docker.pkg.dev/fintech-data-hub-45513/fintech-apps/financial-edgar-app:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: fintech-platform-env
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1024Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: financial-edgar-app
+  namespace: fintech-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: financial-edgar-app
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http

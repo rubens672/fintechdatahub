@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: financial-user-web
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/name: financial-user-web
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: financial-user-web
+  template:
+    metadata:
+      labels:
+        app: financial-user-web
+    spec:
+      serviceAccountName: fintech-workload-sa
+      containers:
+      - name: app
+        image: europe-west1-docker.pkg.dev/fintech-data-hub-45513/fintech-apps/financial-user-web:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: fintech-platform-env
+        env:
+        - name: ETORO_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: etoro-credentials
+              key: public-key
+              optional: true
+        - name: ETORO_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: etoro-credentials
+              key: private-key
+              optional: true
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "768Mi"
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: financial-user-web
+  namespace: fintech-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: financial-user-web
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http

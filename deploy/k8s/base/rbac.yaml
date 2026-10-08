@@ -1,0 +1,36 @@
+# ==============================================================================
+# rbac.yaml — Ruoli e Permessi per il ServiceAccount fintech-workload-sa
+# ==============================================================================
+# Consente ai Kubernetes CronJob FinOps (scaleup/scaledown) di scalare
+# i deployment nel namespace fintech-platform secondo gli orari di Wall Street.
+# ==============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: finops-deployment-scaler
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments", "deployments/scale"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["batch"]
+  resources: ["cronjobs"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: finops-deployment-scaler-binding
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/part-of: fintech-platform
+subjects:
+- kind: ServiceAccount
+  name: fintech-workload-sa
+  namespace: fintech-platform
+roleRef:
+  kind: Role
+  name: finops-deployment-scaler
+  apiGroup: rbac.authorization.k8s.io

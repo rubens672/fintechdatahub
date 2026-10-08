@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fintech-platform-env
+  namespace: fintech-platform
+data:
+  GOOGLE_CLOUD_PROJECT: "fintech-data-hub-45513"
+  GCP_PROJECT: "fintech-data-hub-45513"
+  FIRESTORE_DATABASE: "fintech-data-hub-fs"
+  GOOGLE_CLOUD_LOCATION: "europe-west1"
+  VERTEX_LOCATION: "us-central1"
+  GOOGLE_GENAI_USE_VERTEXAI: "true"
+  GEMINI_MODEL: "gemini-3.6-flash"
+  MODEL: "gemini-3.6-flash"
+  ETORO_ACCOUNT_MODE: "demo"
+  # CoreDNS routing interno tra microservizi (Zero egress / Zero latenza esterna)
+  ETORO_CLIENT_URL: "http://financial-etoro-service.fintech-platform.svc.cluster.local:8080"
+  EDGAR_APP_URL: "http://financial-edgar-app.fintech-platform.svc.cluster.local:8080"
+  ALPHA_HARVEST_URL: "http://alpha-harvest-agent.fintech-platform.svc.cluster.local:8080"
+  QUANT_AGENT_URL: "http://eodhd-agent.fintech-platform.svc.cluster.local:8080"
+  MCP_SERVER_URL: "http://financial-mcp-server.fintech-platform.svc.cluster.local:8080"

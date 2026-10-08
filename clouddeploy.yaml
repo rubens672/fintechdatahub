@@ -1,0 +1,97 @@
+# ==============================================================================
+# clouddeploy.yaml — Declarative Google Cloud Deploy Pipeline & Targets
+# ==============================================================================
+# Questo file definisce la DeliveryPipeline e i due Target (financial-test e financial-prod)
+# per il rilascio continuo gestito con Google Cloud Deploy.
+#
+# Per applicare manualmente o tramite pipeline:
+#   gcloud deploy apply --file=clouddeploy.yaml --region=europe-west1 --project=fintech-data-hub-45513
+# ==============================================================================
+
+apiVersion: deploy.cloud.google.com/v1
+kind: DeliveryPipeline
+metadata:
+  name: financial-platform-pipeline
+  labels:
+    tier: institutional
+    managed-by: cloud-deploy
+description: "Pipeline istituzionale di Continuous Delivery a 2 ambienti (Test e Produzione) per microservizi finanziari"
+serialPipeline:
+  stages:
+  # ----------------------------------------------------------------------------
+  # Stadio 1: Test & Collaudo (Rollout automatico con verifica post-deploy)
+  # ----------------------------------------------------------------------------
+  - targetId: financial-test
+    profiles:
+    - test
+    strategy:
+      standard:
+        verify: true
+
+  # ----------------------------------------------------------------------------
+  # Stadio 2: Produzione (Rollout automatico continuo senza approvazione)
+  # ----------------------------------------------------------------------------
+  - targetId: financial-prod
+    profiles:
+    - prod
+    strategy:
+      standard:
+        verify: false
+---
+# ==============================================================================
+# Target 1: Ambiente di Test & Collaudo (Google Kubernetes Engine Autopilot - europe-west1)
+# ==============================================================================
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: financial-test
+  labels:
+    env: test
+    runtime: gke
+description: "Ambiente di Test & Collaudo su Google Kubernetes Engine Autopilot (Rollout automatico)"
+gke:
+  cluster: projects/fintech-data-hub-45513/locations/europe-west1/clusters/fintech-gke-prod
+executionConfigs:
+- usages:
+  - RENDER
+  - DEPLOY
+  - VERIFY
+  serviceAccount: clouddeploy-runner@fintech-data-hub-45513.iam.gserviceaccount.com
+---
+# ==============================================================================
+# Target 2: Ambiente di Produzione (Google Kubernetes Engine Autopilot - europe-west1 Rollout Automatico)
+# ==============================================================================
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: financial-prod
+  labels:
+    env: production
+    runtime: gke
+description: "Ambiente di Produzione su Google Kubernetes Engine Autopilot (Rollout automatico senza approvazione)"
+requireApproval: false
+gke:
+  cluster: projects/fintech-data-hub-45513/locations/europe-west1/clusters/fintech-gke-prod
+executionConfigs:
+- usages:
+  - RENDER
+  - DEPLOY
+  - VERIFY
+  serviceAccount: clouddeploy-runner@fintech-data-hub-45513.iam.gserviceaccount.com
+---
+# ==============================================================================
+# Automation: Promozione Automatica da Test a Produzione senza consenso manuale
+# ==============================================================================
+apiVersion: deploy.cloud.google.com/v1
+kind: Automation
+metadata:
+  name: financial-platform-pipeline/auto-promote-to-prod
+description: "Promuove automaticamente la release da financial-test a financial-prod dopo il completamento con successo dello smoke test"
+serviceAccount: clouddeploy-runner@fintech-data-hub-45513.iam.gserviceaccount.com
+selector:
+  targets:
+  - id: financial-test
+rules:
+- promoteReleaseRule:
+    id: promote-test-to-prod
+

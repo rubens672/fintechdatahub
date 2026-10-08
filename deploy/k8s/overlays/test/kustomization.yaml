@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fintech-test
+resources:
+- ../../base
+nameSuffix: -test
+commonLabels:
+  env: test
+replicas:
+- name: financial-service
+  count: 1

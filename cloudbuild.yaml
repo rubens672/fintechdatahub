@@ -1,0 +1,279 @@
+# ==============================================================================
+# Cloud Build CI/CD Pipeline — Financial Platform (GKE Autopilot + Cloudflare)
+# Deploys 8 microservices & 7 native CronJobs to GKE Autopilot (europe-west1)
+# Triggered on push to: main branch
+# ==============================================================================
+
+substitutions:
+  _REGION: europe-west1
+  _PROJECT: fintech-data-hub-45513
+  _REPO: fintech-apps
+  _GKE_CLUSTER: fintech-gke-prod
+  _RUN_SA: cloudrun-sa@fintech-data-hub-45513.iam.gserviceaccount.com
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 2400s  # 40 min max
+
+steps:
+  # ============================================================
+  # PHASE 1: Build Docker Images (parallelizzate per tutti gli 8 moduli)
+  # ============================================================
+
+  # 1a. Build financial-cockpit-web
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-cockpit'
+    waitFor: ['-']
+    args:
+      - build
+      - --file=financial-cockpit-web/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-cockpit-web:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-cockpit-web:latest
+      - --cache-from=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-cockpit-web:latest
+      - --build-arg=BUILDKIT_INLINE_CACHE=1
+      - .
+
+  # 1b. Build financial-user-web
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-user'
+    waitFor: ['-']
+    args:
+      - build
+      - --file=financial-user-web/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-user-web:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-user-web:latest
+      - --cache-from=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-user-web:latest
+      - --build-arg=BUILDKIT_INLINE_CACHE=1
+      - .
+
+  # 1c. Build financial-chainlit-app
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-chainlit'
+    waitFor: ['-']
+    args:
+      - build
+      - --file=financial-chainlit-app/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-chainlit-app:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-chainlit-app:latest
+      - --cache-from=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-chainlit-app:latest
+      - --build-arg=BUILDKIT_INLINE_CACHE=1
+      - .
+
+  # 1d. Build financial-mcp-server
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-mcp'
+    waitFor: ['-']
+    args:
+      - build
+      - --file=financial-mcp-server/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-mcp-server:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-mcp-server:latest
+      - --cache-from=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-mcp-server:latest
+      - --build-arg=BUILDKIT_INLINE_CACHE=1
+      - .
+
+  # 1e. Build financial-edgar-app
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-edgar-app'
+    waitFor: ['-']
+    args:
+      - build
+      - --file=financial-edgar-app/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-edgar-app:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-edgar-app:latest
+      - --cache-from=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-edgar-app:latest
+      - --build-arg=BUILDKIT_INLINE_CACHE=1
+      - .
+
+  # 1f. Build financial-etoro-service (Java 21 / Spring Boot 3)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-etoro-service'
+    waitFor: ['-']
+    args:
+      - build
+      - --file=financial-etoro-service/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-etoro-service:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-etoro-service:latest
+      - --cache-from=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-etoro-service:latest
+      - --build-arg=BUILDKIT_INLINE_CACHE=1
+      - .
+
+  # 1g. Build alpha-harvest-agent (Google ADK & Gemini 3.6 Flash)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-harvest-agent'
+    waitFor: ['-']
+    args:
+      - build
+      - --file=alpha-harvest-agent/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/alpha-harvest-agent:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/alpha-harvest-agent:latest
+      - --cache-from=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/alpha-harvest-agent:latest
+      - --build-arg=BUILDKIT_INLINE_CACHE=1
+      - .
+
+  # 1h. Build eodhd-agent (ADK DAG Engine a 7 Nodi)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-eodhd-agent'
+    waitFor: ['-']
+    args:
+      - build
+      - --file=eodhd-agent/Dockerfile
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/eodhd-agent:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/eodhd-agent:latest
+      - --cache-from=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/eodhd-agent:latest
+      - --build-arg=BUILDKIT_INLINE_CACHE=1
+      - .
+
+  # ============================================================
+  # PHASE 2: Push Images to Artifact Registry (parallelo)
+  # ============================================================
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-cockpit'
+    waitFor: ['build-cockpit']
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-cockpit-web
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-user'
+    waitFor: ['build-user']
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-user-web
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-chainlit'
+    waitFor: ['build-chainlit']
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-chainlit-app
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-mcp'
+    waitFor: ['build-mcp']
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-mcp-server
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-edgar-app'
+    waitFor: ['build-edgar-app']
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-edgar-app
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-etoro-service'
+    waitFor: ['build-etoro-service']
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-etoro-service
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-harvest-agent'
+    waitFor: ['build-harvest-agent']
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/alpha-harvest-agent
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-eodhd-agent'
+    waitFor: ['build-eodhd-agent']
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/eodhd-agent
+
+  # ============================================================
+  # PHASE 3: Release & Continuous Delivery via Google Cloud Deploy -> GKE Autopilot
+  # ============================================================
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    id: 'cloud-deploy-release-gke'
+    waitFor:
+      - 'push-cockpit'
+      - 'push-user'
+      - 'push-chainlit'
+      - 'push-mcp'
+      - 'push-edgar-app'
+      - 'push-etoro-service'
+      - 'push-harvest-agent'
+      - 'push-eodhd-agent'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -e
+        echo "=== 0. Installazione gke-gcloud-auth-plugin, kubectl e skaffold ==="
+        apt-get update -qq && apt-get install -y -qq curl google-cloud-cli-gke-gcloud-auth-plugin kubectl
+        curl -fsSL -o /usr/local/bin/skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64
+        chmod +x /usr/local/bin/skaffold
+        skaffold version
+
+        echo "=== 1. Sincronizzazione Pipeline e Target Google Cloud Deploy (GKE Autopilot) ==="
+        gcloud deploy apply \
+          --file=clouddeploy.yaml \
+          --region=${_REGION} \
+          --project=${_PROJECT}
+
+        SHORT_SHA=$$(echo "$COMMIT_SHA" | cut -c1-7)
+        if [ -z "$$SHORT_SHA" ]; then
+          SHORT_SHA=$$(date +%Y%m%d-%H%M%S)
+        fi
+
+        # Genera un nome di release univoco o con suffisso build/timestamp se la release esiste già
+        RELEASE_NAME="rel-$${SHORT_SHA}"
+        if gcloud deploy releases describe "$${RELEASE_NAME}" --delivery-pipeline=financial-platform-pipeline --region=${_REGION} --project=${_PROJECT} >/dev/null 2>&1; then
+          SHORT_BUILD_ID=$$(echo "$$BUILD_ID" | cut -c1-6)
+          if [ -n "$$SHORT_BUILD_ID" ]; then
+            RELEASE_NAME="rel-$${SHORT_SHA}-$${SHORT_BUILD_ID}"
+          else
+            RELEASE_NAME="rel-$${SHORT_SHA}-$$(date +%H%M%S)"
+          fi
+          echo "La release rel-$${SHORT_SHA} esiste già. Utilizzo release name univoco: $${RELEASE_NAME}"
+        fi
+
+        echo "=== 2. Creazione Release Google Cloud Deploy ($${RELEASE_NAME}) per GKE Autopilot ==="
+        gcloud deploy releases create "$${RELEASE_NAME}" \
+          --delivery-pipeline=financial-platform-pipeline \
+          --region=${_REGION} \
+          --project=${_PROJECT} \
+          --skaffold-file=skaffold.yaml \
+          --images=\
+        financial-cockpit-web=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-cockpit-web:$COMMIT_SHA,\
+        financial-user-web=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-user-web:$COMMIT_SHA,\
+        financial-chainlit-app=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-chainlit-app:$COMMIT_SHA,\
+        financial-mcp-server=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-mcp-server:$COMMIT_SHA,\
+        financial-edgar-app=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-edgar-app:$COMMIT_SHA,\
+        financial-etoro-service=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-etoro-service:$COMMIT_SHA,\
+        alpha-harvest-agent=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/alpha-harvest-agent:$COMMIT_SHA,\
+        eodhd-agent=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/eodhd-agent:$COMMIT_SHA
+
+        echo "=== 3. Connessione al Cluster GKE Autopilot ${_GKE_CLUSTER} & Verifica Stato ==="
+        gcloud container clusters get-credentials ${_GKE_CLUSTER} \
+          --region=${_REGION} \
+          --project=${_PROJECT}
+
+        kubectl apply -k deploy/k8s/overlays/prod
+        kubectl get deployments,cronjobs -n fintech-platform
+
+# Images to track in Artifact Registry
+images:
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-cockpit-web:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-user-web:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-chainlit-app:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-mcp-server:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-edgar-app:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/financial-etoro-service:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/alpha-harvest-agent:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/eodhd-agent:$COMMIT_SHA

@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eodhd-agent
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/name: eodhd-agent
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eodhd-agent
+  template:
+    metadata:
+      labels:
+        app: eodhd-agent
+    spec:
+      serviceAccountName: fintech-workload-sa
+      containers:
+      - name: app
+        image: europe-west1-docker.pkg.dev/fintech-data-hub-45513/fintech-apps/eodhd-agent:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: fintech-platform-env
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1024Mi"
+          limits:
+            cpu: "1500m"
+            memory: "2048Mi"
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 8
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eodhd-agent
+  namespace: fintech-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: eodhd-agent
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http

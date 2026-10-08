@@ -1,0 +1,43 @@
+# ==============================================================================
+# terraform.tfvars.example — Esempio di Valori per le Variabili Terraform
+# ==============================================================================
+# Istruzioni:
+# 1. Copia questo file rinominandolo in 'terraform.tfvars':
+#    cp terraform.tfvars.example terraform.tfvars
+# 2. Personalizza i valori qui sotto in base alle tue esigenze.
+# 3. NOTA DI SICUREZZA: Non committare MAI su Git il file 'terraform.tfvars' se
+#    contiene chiavi segrete reali! È già incluso nel .gitignore.
+# ==============================================================================
+
+project_id             = "fintech-data-hub-45513"
+region                 = "europe-west1" # Belgio (supporta Domain Mapping nativo a 0,00 €)
+zone                   = "europe-west1-b"
+firestore_database_id  = "fintech-data-hub-fs"
+artifact_repository_id = "fintech-apps"
+image_tag              = "latest"
+
+# Modalità Trading eToro ("demo" o "real")
+etoro_account_mode     = "demo"
+
+# Motore eToro attivo ("python" o "springboot") & Dual-Deploy (costo 0,00 € inattivo)
+etoro_engine                   = "python"
+enable_etoro_springboot_deploy = true
+
+# Chiavi opzionali se vuoi impostarle direttamente via Terraform
+# (oppure lasciale vuote e gestiscile via Secret Manager o .env)
+# etoro_public_key     = "tua-chiave-pubblica-etoro"
+# etoro_private_key    = "tua-chiave-privata-etoro"
+
+# Domini Personalizzati (Cloud Run Domain Mapping a costo zero 0,00 €)
+# custom_domain_cockpit = "cockpit.berticloud.ai"
+# custom_domain_user    = "app.berticloud.ai"
+
+# Flag di deploy
+enable_cloud_run_deploy    = true
+enable_cloud_scheduler     = true
+enable_cloud_build_trigger = true
+
+# Parametri GitHub per Cloud Build
+github_repo_owner     = "rubens672"
+github_repo_name      = "antigravity-challenge-lab"
+github_branch_pattern = "^main$"

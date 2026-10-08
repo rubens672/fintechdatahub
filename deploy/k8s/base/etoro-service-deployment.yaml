@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: financial-etoro-service
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/name: financial-etoro-service
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: financial-etoro-service
+  template:
+    metadata:
+      labels:
+        app: financial-etoro-service
+    spec:
+      serviceAccountName: fintech-workload-sa
+      terminationGracePeriodSeconds: 25
+      containers:
+      - name: etoro-service
+        image: europe-west1-docker.pkg.dev/fintech-data-hub-45513/fintech-apps/financial-etoro-service:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: fintech-platform-env
+        env:
+        - name: ETORO_ACCOUNT_MODE
+          value: "demo"
+        # Chiavi eToro lette da Secret Kubernetes sincronizzato da Secret Manager
+        - name: ETORO_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: etoro-credentials
+              key: public-key
+              optional: true
+        - name: ETORO_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: etoro-credentials
+              key: private-key
+              optional: true
+        resources:
+          requests:
+            cpu: "300m"
+            memory: "768Mi"
+          limits:
+            cpu: "500m"
+            memory: "1024Mi"
+        startupProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          failureThreshold: 30
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: financial-etoro-service
+  namespace: fintech-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: financial-etoro-service
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
