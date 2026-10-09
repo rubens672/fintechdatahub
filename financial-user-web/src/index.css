@@ -2328,7 +2328,7 @@ h1, h2, h3, h4, .font-display {
   display: flex;
   gap: 32px;
   width: max-content;
-  animation: marqueeSlide 42s linear infinite;
+  animation: marqueeSlide 110s linear infinite;
 }
 
 .tape-track:hover {
@@ -3775,15 +3775,15 @@ h1, h2, h3, h4, .font-display {
 
 /* Variable Speeds: Row 2 (More items) faster, Row 1 (fewer items) slower */
 .auto-marquee-row1 {
-  animation: marquee-scroll-infinite 56s linear infinite;
+  animation: marquee-scroll-infinite 75s linear infinite;
 }
 
 .auto-marquee-row2 {
-  animation: marquee-scroll-infinite 36s linear infinite;
+  animation: marquee-scroll-infinite 65s linear infinite;
 }
 
 .auto-marquee-row3 {
-  animation: marquee-scroll-infinite 44s linear infinite;
+  animation: marquee-scroll-infinite 70s linear infinite;
 }
 
 .yahoo-marquee-track:hover {

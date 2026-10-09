@@ -66,12 +66,12 @@ const ROW3_GLOBAL_CONFIG = [
   { symbol: 'USDCHF=X', label: 'USD / CHF', tag: 'USD/CHF', badge: 'FOREX', group: 'forex' },
 ];
 
-const SWR_CACHE_KEY = 'FINTECH_MARQUEE_SWR_CACHE';
-const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+const SWR_CACHE_KEY = 'FINTECH_MARQUEE_PERSISTENT_CACHE_V2';
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours persistent cache for instant initial render
 
 const loadCachedMarquee = () => {
   try {
-    const raw = sessionStorage.getItem(SWR_CACHE_KEY);
+    const raw = localStorage.getItem(SWR_CACHE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Date.now() - (parsed.timestamp || 0) < CACHE_TTL_MS) {
@@ -79,18 +79,18 @@ const loadCachedMarquee = () => {
       }
     }
   } catch (e) {
-    // sessionStorage not accessible or disabled
+    // localStorage not accessible
   }
   return null;
 };
 
 const saveRowToCache = (rowKey, data) => {
   try {
-    const raw = sessionStorage.getItem(SWR_CACHE_KEY);
+    const raw = localStorage.getItem(SWR_CACHE_KEY);
     const cached = raw ? JSON.parse(raw) : { timestamp: Date.now() };
     cached[rowKey] = data;
     cached.timestamp = Date.now();
-    sessionStorage.setItem(SWR_CACHE_KEY, JSON.stringify(cached));
+    localStorage.setItem(SWR_CACHE_KEY, JSON.stringify(cached));
   } catch (e) {
     // ignore quota/disabled errors
   }
@@ -98,7 +98,10 @@ const saveRowToCache = (rowKey, data) => {
 
 const buildInitialRow = (configList, cachedItems) => {
   if (cachedItems && Array.isArray(cachedItems) && cachedItems.length === configList.length) {
-    return cachedItems;
+    return cachedItems.map((item) => ({
+      ...item,
+      isShimmer: false,
+    }));
   }
   return configList.map((cfg) => ({
     symbol: cfg.tag || cfg.symbol,
@@ -122,14 +125,22 @@ export function YahooMarketMarquee({ onSelectSymbol, activeSymbol }) {
   const [row2Data, setRow2Data] = useState(() => buildInitialRow(ROW2_EQUITIES_CONFIG, cached?.row2));
   const [row3Data, setRow3Data] = useState(() => buildInitialRow(ROW3_GLOBAL_CONFIG, cached?.row3));
 
-  const fetchBatchRow = async (configList, rowKey) => {
+  const rowsRef = React.useRef({ r1: row1Data, r2: row2Data, r3: row3Data });
+  useEffect(() => {
+    rowsRef.current = { r1: row1Data, r2: row2Data, r3: row3Data };
+  }, [row1Data, row2Data, row3Data]);
+
+  const fetchBatchRow = async (configList, rowKey, currentRow) => {
     const symbols = configList.map((c) => c.symbol);
     try {
       const res = await api.getBatchSparklines(symbols, '1d', '5m');
       const itemsMap = (res && res.items) || {};
 
-      const updated = configList.map((cfg) => {
+      const updated = configList.map((cfg, idx) => {
         const live = itemsMap[cfg.symbol];
+        const existing = currentRow && currentRow[idx];
+
+        // 1. Live data with authentic sparkline
         if (live && live.sparkline && live.sparkline.length >= 2) {
           return {
             symbol: cfg.tag || cfg.symbol,
@@ -145,17 +156,31 @@ export function YahooMarketMarquee({ onSelectSymbol, activeSymbol }) {
             isShimmer: false,
           };
         }
+
+        // 2. Preserve existing valid card data if live response was delayed or partial
+        if (existing && existing.sparkline && existing.sparkline.length >= 2 && existing.price) {
+          return {
+            ...existing,
+            price: (live?.price !== undefined && live?.price !== null) ? live.price : existing.price,
+            change: (live?.change !== undefined && live?.change !== null) ? live.change : existing.change,
+            change_p: (live?.change_p !== undefined && live?.change_p !== null) ? live.change_p : existing.change_p,
+            is_positive: (live?.change !== undefined && live?.change !== null) ? (live.change >= 0) : existing.is_positive,
+            isShimmer: false,
+          };
+        }
+
+        // 3. Fallback to basic live quote
         return {
           symbol: cfg.tag || cfg.symbol,
           ticker: cfg.symbol,
           name: cfg.label,
           badge: cfg.badge,
           group: cfg.group,
-          price: live?.price ?? null,
-          change: live?.change ?? 0,
-          change_p: live?.change_p ?? 0,
+          price: live?.price ?? (existing?.price ?? null),
+          change: live?.change ?? (existing?.change ?? 0),
+          change_p: live?.change_p ?? (existing?.change_p ?? 0),
           is_positive: (live?.change ?? 0) >= 0,
-          sparkline: live?.sparkline ?? [],
+          sparkline: (live?.sparkline && live.sparkline.length >= 2) ? live.sparkline : (existing?.sparkline || []),
           isShimmer: false,
         };
       });
@@ -169,23 +194,33 @@ export function YahooMarketMarquee({ onSelectSymbol, activeSymbol }) {
   };
 
   const loadAllRows = () => {
-    // Progressive streaming: each row is dispatched independently for instant updates
-    fetchBatchRow(ROW1_INSTITUTIONAL_CONFIG, 'row1').then((r1) => {
+    // Stagger row requests to prevent socket congestion and API rate-limiting
+    fetchBatchRow(ROW1_INSTITUTIONAL_CONFIG, 'row1', rowsRef.current.r1).then((r1) => {
       if (r1) setRow1Data(r1);
     });
 
-    fetchBatchRow(ROW2_EQUITIES_CONFIG, 'row2').then((r2) => {
-      if (r2) setRow2Data(r2);
-    });
+    const timer2 = setTimeout(() => {
+      fetchBatchRow(ROW2_EQUITIES_CONFIG, 'row2', rowsRef.current.r2).then((r2) => {
+        if (r2) setRow2Data(r2);
+      });
+    }, 450);
 
-    fetchBatchRow(ROW3_GLOBAL_CONFIG, 'row3').then((r3) => {
-      if (r3) setRow3Data(r3);
-    });
+    const timer3 = setTimeout(() => {
+      fetchBatchRow(ROW3_GLOBAL_CONFIG, 'row3', rowsRef.current.r3).then((r3) => {
+        if (r3) setRow3Data(r3);
+      });
+    }, 900);
+
+    return () => {
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+    };
   };
 
   useEffect(() => {
     loadAllRows();
-    const interval = setInterval(loadAllRows, 30000);
+    // 60-second refresh cycle for stable real-time updates without thrashing
+    const interval = setInterval(loadAllRows, 60000);
     return () => clearInterval(interval);
   }, []);
 
