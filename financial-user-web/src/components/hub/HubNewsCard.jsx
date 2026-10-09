@@ -51,7 +51,7 @@ export function HubNewsCard({ article, onSelectArticle, onFocusTicker, onOpenCor
   const formattedPrice = React.useMemo(() => {
     const sym = article.primary_ticker;
     const p = article.price;
-    if (p === undefined || p === null) return '---';
+    if (p === undefined || p === null || p <= 0) return '---';
     if (sym === '^TNX') return `${p.toFixed(2)}%`;
     if (sym === 'GLOBAL') return 'World Index';
     if (sym === 'DXY') return `${p.toFixed(2)} pts`;
@@ -65,7 +65,12 @@ export function HubNewsCard({ article, onSelectArticle, onFocusTicker, onOpenCor
     if (sym === 'GLOBAL') return '🌐 ';
     if (sym === 'CL=F') return '🛢️ ';
     if (sym === 'GC=F') return '🪙 ';
+    if (sym === 'SLV') return '🥈 ';
+    if (sym === 'CPER') return '🥉 ';
     if (sym === 'DXY') return '💵 ';
+    if (sym === 'BTC-USD' || sym === 'ETH-USD') return '₿ ';
+    if (sym === '^VIX') return '⚡ ';
+    if (['SPY', 'QQQ', 'DIA', 'IWM'].includes(sym)) return '📊 ';
     return '';
   }, [article.primary_ticker]);
 
@@ -85,7 +90,7 @@ export function HubNewsCard({ article, onSelectArticle, onFocusTicker, onOpenCor
           >
             <span className="ticker-code">{tickerPrefix}{article.primary_ticker}</span>
             <span className="ticker-price">{formattedPrice}</span>
-            {article.primary_ticker !== 'GLOBAL' && (
+            {article.primary_ticker !== 'GLOBAL' && article.price > 0 && (
               <span className={`ticker-change ${changeP >= 0 ? 'bullish' : 'bearish'}`}>
                 {changeP >= 0 ? '+' : ''}{changeP.toFixed(2)}%
               </span>

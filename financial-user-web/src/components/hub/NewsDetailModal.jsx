@@ -10,6 +10,17 @@ export function NewsDetailModal({ isOpen, onClose, article, onFocusTicker, onOpe
   const isBearish = score <= -0.20;
   const ticker = article.primary_ticker || article.ticker;
 
+  const modalFormattedPrice = React.useMemo(() => {
+    const sym = article.primary_ticker || article.ticker;
+    const p = article.price;
+    if (p === undefined || p === null || p <= 0) return null;
+    if (sym === '^TNX') return `${p.toFixed(2)}%`;
+    if (sym === 'GLOBAL') return 'World Index';
+    if (sym === 'DXY') return `${p.toFixed(2)} pts`;
+    if (p >= 1000) return `$${p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `$${p.toFixed(2)}`;
+  }, [article.primary_ticker, article.ticker, article.price]);
+
   const cleanTitle = React.useMemo(() => {
     let t = (article.title || '').trim();
     if (article.publisher && t.toLowerCase().endsWith(` - ${article.publisher.toLowerCase()}`)) {
@@ -142,10 +153,12 @@ export function NewsDetailModal({ isOpen, onClose, article, onFocusTicker, onOpe
                 {ticker && (
                   <div className="meta-chip ticker font-mono">
                     <span>Ticker: {ticker}</span>
-                    <span className="price">${article.price?.toFixed(2)}</span>
-                    <span className={`change ${article.change_p >= 0 ? 'bullish' : 'bearish'}`}>
-                      {article.change_p >= 0 ? '+' : ''}{article.change_p?.toFixed(2)}%
-                    </span>
+                    {modalFormattedPrice && <span className="price">{modalFormattedPrice}</span>}
+                    {article.price > 0 && article.primary_ticker !== 'GLOBAL' && (
+                      <span className={`change ${article.change_p >= 0 ? 'bullish' : 'bearish'}`}>
+                        {article.change_p >= 0 ? '+' : ''}{article.change_p?.toFixed(2)}%
+                      </span>
+                    )}
                   </div>
                 )}
 
