@@ -1,0 +1,17 @@
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: cockpit-web-monitoring
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/name: financial-cockpit-web
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  selector:
+    matchLabels:
+      app: financial-cockpit-web
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    timeout: 10s

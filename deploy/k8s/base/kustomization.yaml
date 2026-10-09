@@ -19,3 +19,6 @@ resources:
 - mcp-server-deployment.yaml
 - eodhd-agent-deployment.yaml
 - cronjobs.yaml
+- podmonitoring-etoro-service.yaml
+- podmonitoring-cockpit-web.yaml
+- podmonitoring-cloudflared.yaml

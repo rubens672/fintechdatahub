@@ -1,0 +1,17 @@
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: etoro-service-monitoring
+  namespace: fintech-platform
+  labels:
+    app.kubernetes.io/name: financial-etoro-service
+    app.kubernetes.io/part-of: fintech-platform
+spec:
+  selector:
+    matchLabels:
+      app: financial-etoro-service
+  endpoints:
+  - port: http
+    path: /actuator/prometheus
+    interval: 15s
+    timeout: 10s

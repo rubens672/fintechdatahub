@@ -210,3 +210,19 @@ variable "gke_cluster_name" {
   default     = "fintech-gke-prod"
 }
 
+# ------------------------------------------------------------------------------
+# 10. Google Cloud Monitoring & Observability (Bottlenecks Detection)
+# ------------------------------------------------------------------------------
+
+variable "enable_monitoring_observability" {
+  type        = bool
+  description = "Abilita la creazione della dashboard dei colli di bottiglia e delle policy di allarme PromQL in Google Cloud Monitoring."
+  default     = true
+}
+
+variable "enable_monitoring_alerts" {
+  type        = bool
+  description = "Abilita le policy di allarme PromQL. Va attivato dopo il primo deployment dei pod quando le metriche sono state ingerite da GMP."
+  default     = false
+}
+

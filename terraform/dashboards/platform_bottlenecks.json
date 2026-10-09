@@ -1,0 +1,86 @@
+{
+  "displayName": "Fintech Platform - Bottlenecks & Observability Dashboard",
+  "gridLayout": {
+    "columns": "2",
+    "widgets": [
+      {
+        "title": "eToro API Rate Limiter Contention (Waiting Threads)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "prometheusQuery": "sum(resilience4j_ratelimiter_waiting_threads{name=\"etoroApi\"})"
+              },
+              "plotType": "LINE"
+            }
+          ]
+        }
+      },
+      {
+        "title": "eToro API Outbound Latency (p95)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "prometheusQuery": "histogram_quantile(0.95, sum(rate(http_client_requests_seconds_bucket[5m])) by (le))"
+              },
+              "plotType": "LINE"
+            }
+          ]
+        }
+      },
+      {
+        "title": "JVM Garbage Collection Pause Duration (seconds)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "prometheusQuery": "sum(rate(jvm_gc_pause_seconds_sum[5m])) / sum(rate(jvm_gc_pause_seconds_count[5m]))"
+              },
+              "plotType": "LINE"
+            }
+          ]
+        }
+      },
+      {
+        "title": "JVM Live Active Threads",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "prometheusQuery": "jvm_threads_live_threads"
+              },
+              "plotType": "LINE"
+            }
+          ]
+        }
+      },
+      {
+        "title": "FastAPI Cockpit Requests Latency (p99)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "prometheusQuery": "histogram_quantile(0.99, sum(rate(fastapi_requests_duration_seconds_bucket[5m])) by (le))"
+              },
+              "plotType": "LINE"
+            }
+          ]
+        }
+      },
+      {
+        "title": "Kubernetes Pod CPU Throttling Ratio",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "prometheusQuery": "sum(increase(container_cpu_cfs_throttled_periods_total[5m])) by (pod) / sum(increase(container_cpu_cfs_periods_total[5m])) by (pod)"
+              },
+              "plotType": "LINE"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
