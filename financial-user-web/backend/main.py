@@ -172,6 +172,9 @@ async def startup_ws_broadcaster():
     if market_ws_manager is not None:
         market_ws_manager.ensure_broadcaster_running()
 
+    if hub_service is not None:
+        asyncio.create_task(hub_service.start_background_news_daemon(interval_seconds=600))
+
     # Ensure Firestore run documents have verified execution orders & close receipts
     try:
         if workflow_db is not None and getattr(workflow_db, "_db", None) is not None:
@@ -1980,26 +1983,23 @@ async def get_graph_design_doc_view():
       background: rgba(11, 17, 32, 0.95);
       border: 1px solid var(--border-color);
       border-radius: 12px;
-      padding: 28px 20px;
-      margin: 32px 0;
+      padding: 24px 20px;
+      margin: 28px auto;
       text-align: center;
       overflow-x: auto;
       overflow-y: hidden;
       box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
       box-sizing: border-box;
+      max-width: 900px;
       width: 100%;
     }}
-    .mermaid svg {{
-      max-width: 100% !important;
-      height: auto !important;
-      display: block;
-      margin: 0 auto;
-    }}
+    .mermaid svg,
     .mermaid-ecosystem svg {{
       max-width: 880px !important;
       width: 100% !important;
       height: auto !important;
       margin: 0 auto;
+      display: block;
     }}
     .katex-display-wrapper {{
       margin: 20px 0;
@@ -2145,11 +2145,11 @@ async def get_graph_design_doc_view():
         // Render mermaid diagrams safely
         if (typeof mermaid !== 'undefined') {{
           try {{
-            document.querySelectorAll('pre code.language-mermaid').forEach((block, idx) => {{
+            document.querySelectorAll('pre code.language-mermaid').forEach((block) => {{
               const pre = block.parentElement;
               const code = block.textContent;
               const div = document.createElement('div');
-              div.className = idx === 0 ? 'mermaid mermaid-ecosystem' : 'mermaid';
+              div.className = 'mermaid mermaid-ecosystem';
               div.textContent = code;
               pre.replaceWith(div);
             }});

@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import sys
 import time
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # Add workspace modules to sys.path
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -257,8 +257,8 @@ class FintechDataHubService:
     def __init__(self):
         # L1 In-Memory Cache with TTL
         self._l1_cache: Dict[str, Dict[str, Any]] = {}
-        self._l1_ttl_seconds = 30  # 30 seconds for live stream
-        self._l1_pulse_ttl_seconds = 60  # 60 seconds for pulse/heatmap
+        self._l1_ttl_seconds = 300  # 5 minutes for live stream (instant response)
+        self._l1_pulse_ttl_seconds = 180  # 3 minutes for pulse/heatmap
         # In-Memory Quote Cache with TTL for News Tickers
         self._quote_cache: Dict[str, Dict[str, Any]] = {}
         self._quote_cache_timestamps: Dict[str, float] = {}
@@ -748,26 +748,13 @@ class FintechDataHubService:
         except Exception as e:
             logger.warning("Error fetching news from NewsService: %s", e)
 
-        # Smart Invalidation Check: If articles from cache are stale (> 1h old), re-fetch fresh
+        # Smart Invalidation Check: If articles from cache are stale (> 1h old), refresh in background WITHOUT blocking response!
         if not force_refresh and raw_articles:
             now_ts = datetime.now(timezone.utc).timestamp()
             newest_article_ts = max((self._parse_ts(a.get("date")) for a in raw_articles), default=0.0)
             if newest_article_ts > 0 and (now_ts - newest_article_ts) > (1.0 * 3600):
-                logger.info("get_news_stream: Cached articles are > 1h old. Auto-fetching fresh news in background...")
-                try:
-                    from financial_mcp_server.services.news_service import news_service
-                    if ticker:
-                        fresh = await news_service.get_company_news(ticker=ticker.strip().upper(), limit=60, force_refresh=True)
-                    elif catalyst_type and catalyst_type != "ALL":
-                        fresh = await news_service.get_company_news(tag=tag_to_query, limit=60, force_refresh=True)
-                    elif sector and sector != "ALL":
-                        fresh = await news_service.get_company_news(tag=sector, limit=60, force_refresh=True)
-                    else:
-                        fresh = await news_service.get_company_news(tag="market", limit=75, force_refresh=True)
-                    if fresh:
-                        raw_articles = fresh
-                except Exception as e:
-                    logger.debug("Auto-refresh fallback note: %s", e)
+                logger.info("get_news_stream: Cached articles are > 1h old. Triggering non-blocking background refresh...")
+                asyncio.create_task(self._background_refresh_channel(ticker, tag_to_query, sector))
 
         # If empty, return authentic empty list
         if not raw_articles:
@@ -829,33 +816,70 @@ class FintechDataHubService:
         self._set_l1(cache_key, result)
         return result
 
-    def _fetch_yfinance_fast_batch(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
-        """Fast synchronous yfinance fetcher for quotes."""
-        out = {}
+    async def _background_refresh_channel(
+        self,
+        ticker: Optional[str] = None,
+        tag_to_query: Optional[str] = None,
+        sector: Optional[str] = None,
+    ) -> None:
+        """Non-blocking background refresh to keep Firestore warm without user wait."""
+        try:
+            from financial_mcp_server.services.news_service import news_service
+            if ticker:
+                await news_service.get_company_news(ticker=ticker.strip().upper(), limit=60, force_refresh=True)
+            elif tag_to_query and tag_to_query != "ALL":
+                await news_service.get_company_news(tag=tag_to_query, limit=60, force_refresh=True)
+            elif sector and sector != "ALL":
+                await news_service.get_company_news(tag=sector, limit=60, force_refresh=True)
+            else:
+                await news_service.get_company_news(tag="market", limit=75, force_refresh=True)
+        except Exception as e:
+            logger.debug("Background channel refresh note: %s", e)
+
+    def _fetch_single_ticker_quote(self, sym: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+        """Fetch single ticker quote quickly with yfinance."""
         try:
             import yfinance as yf
-            for sym in symbols[:20]:
-                try:
-                    clean = sym.replace(".US", "").strip()
-                    if clean == "DXY":
-                        clean = "DX-Y.NYB"
-                    t = yf.Ticker(clean)
-                    fi = getattr(t, "fast_info", None)
-                    last_p = getattr(fi, "last_price", None)
-                    prev_c = getattr(fi, "previous_close", None)
-                    if last_p is None:
-                        hist = t.history(period="2d")
-                        if not hist.empty:
-                            last_p = float(hist["Close"].iloc[-1])
-                            prev_c = float(hist["Close"].iloc[-2]) if len(hist) > 1 else last_p
-                    if last_p is not None and last_p > 0:
-                        chg_p = round(((last_p - prev_c) / prev_c) * 100, 2) if prev_c else 0.0
-                        out[sym] = {
-                            "close": round(float(last_p), 2),
-                            "change_p": chg_p,
-                        }
-                except Exception:
-                    pass
+            clean = sym.replace(".US", "").strip()
+            if clean == "DXY":
+                clean = "DX-Y.NYB"
+            t = yf.Ticker(clean)
+            fi = getattr(t, "fast_info", None)
+            last_p = getattr(fi, "last_price", None)
+            prev_c = getattr(fi, "previous_close", None)
+            if last_p is None:
+                hist = t.history(period="2d")
+                if not hist.empty:
+                    last_p = float(hist["Close"].iloc[-1])
+                    prev_c = float(hist["Close"].iloc[-2]) if len(hist) > 1 else last_p
+            if last_p is not None and last_p > 0:
+                chg_p = round(((last_p - prev_c) / prev_c) * 100, 2) if prev_c else 0.0
+                return sym, {
+                    "close": round(float(last_p), 2),
+                    "change_p": chg_p,
+                }
+        except Exception:
+            pass
+        return None
+
+    def _fetch_yfinance_fast_batch(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Fast parallel yfinance fetcher for quotes."""
+        out = {}
+        target_syms = symbols[:20]
+        if not target_syms:
+            return out
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        try:
+            with ThreadPoolExecutor(max_workers=min(len(target_syms), 8)) as executor:
+                future_to_sym = {executor.submit(self._fetch_single_ticker_quote, s): s for s in target_syms}
+                for f in as_completed(future_to_sym, timeout=2.5):
+                    try:
+                        res = f.result()
+                        if res:
+                            sym, data = res
+                            out[sym] = data
+                    except Exception:
+                        pass
         except Exception as e:
             logger.debug("yfinance batch fetch note: %s", e)
         return out
@@ -863,13 +887,13 @@ class FintechDataHubService:
     async def _fetch_quotes_for_tickers(self, tickers: Set[str]) -> Dict[str, Dict[str, Any]]:
         """
         Fetches live quotes for tickers with multi-layer fallback:
-        1. In-memory TTL cache (60s)
+        1. In-memory TTL cache (300s)
         2. LivePriceService (if available)
-        3. Direct yfinance fast_info / 1d history in executor thread
+        3. Direct yfinance fast_info / 1d history in executor thread (parallel)
         4. Reference benchmark prices as ultimate safe floor (never 0.00)
         """
         now = time.time()
-        ttl = 60.0
+        ttl = 300.0
         results: Dict[str, Dict[str, Any]] = {}
         missing = set()
 
