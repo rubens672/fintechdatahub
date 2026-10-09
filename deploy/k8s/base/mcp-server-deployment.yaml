@@ -8,6 +8,11 @@ metadata:
     app.kubernetes.io/part-of: fintech-platform
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: financial-mcp-server
@@ -16,6 +21,7 @@ spec:
       labels:
         app: financial-mcp-server
     spec:
+      terminationGracePeriodSeconds: 30
       serviceAccountName: fintech-workload-sa
       containers:
       - name: app

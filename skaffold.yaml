@@ -47,6 +47,7 @@ manifests:
     - deploy/k8s/overlays/prod
 
 deploy:
+  statusCheckDeadlineSeconds: 600
   kubectl: {}
 
 # Profili di deployment per Google Cloud Deploy su GKE Autopilot
@@ -60,6 +61,7 @@ profiles:
       paths:
       - deploy/k8s/overlays/prod
   deploy:
+    statusCheckDeadlineSeconds: 600
     kubectl: {}
 
 # ------------------------------------------------------------------------------
@@ -71,6 +73,7 @@ profiles:
       paths:
       - deploy/k8s/overlays/prod
   deploy:
+    statusCheckDeadlineSeconds: 600
     kubectl: {}
 
 # ------------------------------------------------------------------------------
@@ -82,6 +85,7 @@ profiles:
       paths:
       - deploy/k8s/overlays/prod
   deploy:
+    statusCheckDeadlineSeconds: 600
     kubectl: {}
 
 # Validazione automatizzata post-deploy (Skaffold Verify)
