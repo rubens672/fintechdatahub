@@ -3773,17 +3773,20 @@ h1, h2, h3, h4, .font-display {
   will-change: transform;
 }
 
-/* Variable Speeds: Row 2 (More items) faster, Row 1 (fewer items) slower */
+/* Variable Speeds & Phased Offsets: all 3 tracks slow and legible, but de-synchronized */
 .auto-marquee-row1 {
-  animation: marquee-scroll-infinite 75s linear infinite;
+  animation: marquee-scroll-infinite 82s linear infinite;
+  animation-delay: 0s;
 }
 
 .auto-marquee-row2 {
-  animation: marquee-scroll-infinite 65s linear infinite;
+  animation: marquee-scroll-infinite 96s linear infinite;
+  animation-delay: -22s;
 }
 
 .auto-marquee-row3 {
-  animation: marquee-scroll-infinite 70s linear infinite;
+  animation: marquee-scroll-infinite 112s linear infinite;
+  animation-delay: -48s;
 }
 
 .yahoo-marquee-track:hover {
