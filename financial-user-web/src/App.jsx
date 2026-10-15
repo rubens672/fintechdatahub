@@ -1343,7 +1343,22 @@ function AppContent({ isCockpit = false }) {
               setCloseModalTarget(null);
             }}
             onPositionsClosed={(res) => {
-              refreshEToroPositions();
+              const closedIds = new Set(
+                (res?.results || [])
+                  .filter((r) => r.status === 'CLOSED')
+                  .map((r) => Number(r.id))
+              );
+              if (closedIds.size > 0) {
+                setEtoroPositions((prev) =>
+                  (prev || []).filter((p) => {
+                    const pid = p.position_id || p.positionId || p.PositionID || p.id;
+                    return !closedIds.has(Number(pid));
+                  })
+                );
+              }
+              setTimeout(() => {
+                refreshEToroPositions();
+              }, 1200);
             }}
           />
         </>

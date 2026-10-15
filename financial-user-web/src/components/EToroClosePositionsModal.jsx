@@ -199,7 +199,8 @@ export default function EToroClosePositionsModal({
     setClosing(true);
     setError(null);
 
-    const posIds = positions.filter((p) => selectedItemIds.has(p.id)).map((p) => p.id);
+    const selectedPosList = positions.filter((p) => selectedItemIds.has(p.id));
+    const posIds = selectedPosList.map((p) => p.id);
     const ordIds = orders.filter((o) => selectedItemIds.has(o.id)).map((o) => o.id);
 
     try {
@@ -208,6 +209,12 @@ export default function EToroClosePositionsModal({
         mode: accountMode,
         position_ids: posIds.length > 0 ? posIds : null,
         order_ids: ordIds.length > 0 ? ordIds : null,
+        positions_meta: selectedPosList.map((p) => ({
+          id: p.id,
+          symbol: p.symbol,
+          instrument_id: p.instrument_id,
+          units: p.units,
+        })),
       };
 
       const result = await api.closeRunPositions(payload);

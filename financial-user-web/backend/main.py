@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 import json
 import math
+import uuid
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -1337,6 +1338,67 @@ LOCAL_INSTRUMENT_MAP = {
     9429: ("CRH", "CRH PLC"),
 }
 
+REVERSE_LOCAL_INSTRUMENT_MAP = {v[0]: k for k, v in LOCAL_INSTRUMENT_MAP.items()}
+
+
+async def direct_etoro_close_single_position(position_id: int, instrument_id: Optional[int] = None, units: Optional[float] = None, mode: str = "demo") -> Dict[str, Any]:
+    """Closes a position directly against eToro Public API with full parameter resolution (InstrumentID)."""
+    pub_key = os.getenv("ETORO_PUBLIC_KEY")
+    priv_key = os.getenv("ETORO_PRIVATE_KEY")
+    if not pub_key or not priv_key:
+        return {"isSuccess": False, "error": "Credenziali eToro assenti in ambiente"}
+
+    path_mode = "demo" if str(mode).lower() == "demo" else "real"
+
+    # Auto-resolve instrument_id if missing
+    if not instrument_id:
+        try:
+            if workflow_db is not None and workflow_db._db is not None:
+                doc = workflow_db._db.collection("etoro_state").document("live_positions").get()
+                if doc.exists:
+                    for p in (doc.to_dict().get("positions") or []):
+                        pid = p.get("positionId") or p.get("positionID") or p.get("id")
+                        if pid and int(pid) == int(position_id):
+                            inst_obj = p.get("instrumentId") or p.get("InstrumentID") or p.get("instrument_id")
+                            if inst_obj:
+                                instrument_id = int(inst_obj)
+                            elif p.get("symbol"):
+                                sym = p.get("symbol").replace(".US", "").strip().upper()
+                                instrument_id = REVERSE_LOCAL_INSTRUMENT_MAP.get(sym)
+                            break
+        except Exception as e:
+            logger.debug("Lookup instrument_id from live_positions error: %s", e)
+
+    url = f"https://public-api.etoro.com/api/v1/trading/execution/{path_mode}/market-close-orders/positions/{position_id}"
+    req_id = str(uuid.uuid4())
+    headers = {
+        "x-api-key": pub_key,
+        "x-user-key": priv_key,
+        "x-request-id": req_id,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    body = {}
+    if instrument_id:
+        body["InstrumentID"] = int(instrument_id)
+        body["InstrumentId"] = int(instrument_id)
+    if units and units > 0:
+        body["UnitsToDeduct"] = float(units)
+
+    logger.info("Direct eToro close call for position %s (instrument %s) on %s with body %s", position_id, instrument_id, url, body)
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(url, headers=headers, json=body)
+            if r.status_code in (200, 201, 202):
+                data = r.json() if r.text else {}
+                return {"isSuccess": True, "data": data}
+            logger.warn("Direct close position %s returned %s: %s", position_id, r.status_code, r.text)
+            return {"isSuccess": False, "statusCode": r.status_code, "error": r.text}
+    except Exception as e:
+        logger.error("Direct close position %s exception: %s", position_id, e)
+        return {"isSuccess": False, "error": str(e)}
+
+
 def _enrich_etoro_trades(trades: list) -> list:
     if not isinstance(trades, list):
         return []
@@ -1544,17 +1606,90 @@ async def user_web_etoro_get_run_active_items(run_id: str, account: str = Query(
 
 @app.post("/api/etoro/close-run")
 async def user_web_etoro_close_run(payload: Dict[str, Any]):
-    """Proxies close-run request to financial-etoro-service microservice."""
+    """Proxies close-run request to financial-etoro-service microservice with resilient direct broker fallback."""
     etoro_url = os.getenv("ETORO_CLIENT_URL", "http://financial-etoro-service.fintech-platform.svc.cluster.local:8080")
+    service_resp = None
     for base in [etoro_url, "http://financial-etoro-service:8080", "http://localhost:8080", "http://127.0.0.1:8080"]:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(f"{base}/api/etoro/close-run", json=payload)
                 if resp.status_code == 200:
-                    return resp.json()
+                    service_resp = resp.json()
+                    break
         except Exception:
             continue
-    raise HTTPException(status_code=503, detail="Microservizio trading eToro non raggiungibile.")
+
+    mode = str(payload.get("mode", "demo"))
+    requested_pos_ids = payload.get("position_ids") or []
+    positions_meta = payload.get("positions_meta") or []
+    meta_map = {int(pm["id"]): pm for pm in positions_meta if "id" in pm}
+
+    results = list(service_resp.get("results") if service_resp else [])
+    total_closed = service_resp.get("total_closed_positions", 0) if service_resp else 0
+    has_errors = any(r.get("status") == "ERROR" for r in results)
+
+    # If financial-etoro-service was unreachable OR returned an error for any position,
+    # execute direct broker fallback with full InstrumentID resolution
+    if not service_resp or has_errors or (requested_pos_ids and total_closed < len(requested_pos_ids)):
+        for pos_id in requested_pos_ids:
+            err_item = next((r for r in results if r.get("id") == pos_id and r.get("status") == "ERROR"), None)
+            is_missing = not any(r.get("id") == pos_id for r in results)
+
+            if err_item or is_missing or not service_resp:
+                pm = meta_map.get(int(pos_id), {})
+                inst_id = pm.get("instrument_id")
+                units = pm.get("units")
+                sym = pm.get("symbol")
+
+                if not inst_id and sym:
+                    inst_id = REVERSE_LOCAL_INSTRUMENT_MAP.get(sym.replace(".US", "").strip().upper())
+
+                direct_res = await direct_etoro_close_single_position(
+                    pos_id, instrument_id=inst_id, units=units, mode=mode
+                )
+                if direct_res.get("isSuccess"):
+                    total_closed += 1
+                    if err_item:
+                        err_item["status"] = "CLOSED"
+                        err_item["error_message"] = None
+                    else:
+                        results.append({
+                            "item_type": "POSITION",
+                            "symbol": sym or "UNKNOWN",
+                            "id": pos_id,
+                            "units": units or 1.0,
+                            "status": "CLOSED",
+                            "error_message": None,
+                        })
+
+    # If any positions were closed, immediately clean up Firestore live_positions snapshot
+    if total_closed > 0 and workflow_db is not None and workflow_db._db is not None:
+        try:
+            doc_ref = workflow_db._db.collection("etoro_state").document("live_positions")
+            doc = doc_ref.get()
+            if doc.exists:
+                d = doc.to_dict() or {}
+                closed_set = {int(r["id"]) for r in results if r.get("status") == "CLOSED" and "id" in r}
+                curr_pos = d.get("positions") or []
+                filtered_pos = [p for p in curr_pos if int(p.get("positionId") or p.get("positionID") or p.get("id") or 0) not in closed_set]
+                doc_ref.set({"positions": filtered_pos, "total": len(filtered_pos)}, merge=True)
+        except Exception as fe:
+            logger.debug("Failed to prune closed positions in Firestore: %s", fe)
+
+    if service_resp:
+        service_resp["results"] = results
+        service_resp["total_closed_positions"] = total_closed
+        return service_resp
+
+    return {
+        "run_id": payload.get("run_id", "ALL"),
+        "mode": mode,
+        "total_closed_positions": total_closed,
+        "total_cancelled_orders": 0,
+        "total_realized_pnl": 0.0,
+        "results": results,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 # --- Alpha Harvest & Reinvestment Intelligence Endpoints (Restricted to Financial Cockpit) ---
