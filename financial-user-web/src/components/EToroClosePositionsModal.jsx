@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, AlertCircle, CheckCircle2, Loader2, 
   ShieldAlert, CheckSquare, Square, DollarSign, 
@@ -31,9 +31,32 @@ export default function EToroClosePositionsModal({
   const [closing, setClosing] = useState(false);
   const [closeReport, setCloseReport] = useState(null);
 
+  // Preserve references to high-frequency streaming props to prevent infinite re-render/flicker loops
+  const livePositionsRef = useRef(livePositions);
+  livePositionsRef.current = livePositions;
+
+  const liveOrdersRef = useRef(liveOrders);
+  liveOrdersRef.current = liveOrders;
+
+  const targetItemRef = useRef(targetItem);
+  targetItemRef.current = targetItem;
+
+  const hasFetchedRef = useRef(false);
+
   // Load live open items for this run or fallback to live broker positions upon opening
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      hasFetchedRef.current = false;
+      setActiveData(null);
+      setSelectedItemIds(new Set());
+      setCloseReport(null);
+      setError(null);
+      setLoading(true);
+      return;
+    }
+
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
 
     let isMounted = true;
     setLoading(true);
@@ -44,8 +67,11 @@ export default function EToroClosePositionsModal({
 
     const buildFallbackItems = () => {
       const fbItems = [];
-      if (Array.isArray(livePositions) && livePositions.length > 0) {
-        livePositions.forEach((p) => {
+      const currentLivePos = livePositionsRef.current;
+      const currentLiveOrd = liveOrdersRef.current;
+
+      if (Array.isArray(currentLivePos) && currentLivePos.length > 0) {
+        currentLivePos.forEach((p) => {
           const pid = p.position_id || p.positionId || p.PositionID || p.id;
           if (pid) {
             const sym = (p.symbol || p.symbolName || '').replace('.US', '').trim().toUpperCase();
@@ -67,8 +93,8 @@ export default function EToroClosePositionsModal({
           }
         });
       }
-      if (Array.isArray(liveOrders) && liveOrders.length > 0) {
-        liveOrders.forEach((o) => {
+      if (Array.isArray(currentLiveOrd) && currentLiveOrd.length > 0) {
+        currentLiveOrd.forEach((o) => {
           const oid = o.order_id || o.orderId || o.OrderID || o.id;
           if (oid) {
             const sym = (o.symbol || o.symbolName || '').replace('.US', '').trim().toUpperCase();
@@ -94,20 +120,21 @@ export default function EToroClosePositionsModal({
     };
 
     const applySelection = (resolvedItems) => {
-      if (targetItem) {
-        const targetSymbol = (targetItem.symbol || targetItem.name || '').replace('.US', '').trim().toUpperCase();
+      const currentTarget = targetItemRef.current;
+      if (currentTarget) {
+        const targetSymbol = (currentTarget.symbol || currentTarget.name || '').replace('.US', '').trim().toUpperCase();
         const targetIds = new Set();
-        if (targetItem.id) targetIds.add(String(targetItem.id));
-        if (targetItem.position_id) targetIds.add(String(targetItem.position_id));
-        if (targetItem.positionId) targetIds.add(String(targetItem.positionId));
-        if (Array.isArray(targetItem.rawPositions)) {
-          targetItem.rawPositions.forEach((rp) => {
+        if (currentTarget.id) targetIds.add(String(currentTarget.id));
+        if (currentTarget.position_id) targetIds.add(String(currentTarget.position_id));
+        if (currentTarget.positionId) targetIds.add(String(currentTarget.positionId));
+        if (Array.isArray(currentTarget.rawPositions)) {
+          currentTarget.rawPositions.forEach((rp) => {
             const rpid = rp.position_id || rp.positionId || rp.PositionID || rp.id;
             if (rpid) targetIds.add(String(rpid));
           });
         }
-        if (Array.isArray(targetItem.rawOrders)) {
-          targetItem.rawOrders.forEach((ro) => {
+        if (Array.isArray(currentTarget.rawOrders)) {
+          currentTarget.rawOrders.forEach((ro) => {
             const roid = ro.order_id || ro.orderId || ro.OrderID || ro.id;
             if (roid) targetIds.add(String(roid));
           });
@@ -124,8 +151,8 @@ export default function EToroClosePositionsModal({
 
         if (matchedIds.size > 0) {
           setSelectedItemIds(matchedIds);
-        } else if (targetItem.id) {
-          setSelectedItemIds(new Set([targetItem.id]));
+        } else if (currentTarget.id) {
+          setSelectedItemIds(new Set([currentTarget.id]));
         } else {
           setSelectedItemIds(new Set(resolvedItems.map((it) => it.id)));
         }
@@ -167,7 +194,7 @@ export default function EToroClosePositionsModal({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, runId, accountMode, targetItem, livePositions, liveOrders]);
+  }, [isOpen, runId, accountMode]);
 
   const items = activeData?.items || [];
   const positions = items.filter((i) => i.item_type === 'POSITION');
@@ -215,6 +242,7 @@ export default function EToroClosePositionsModal({
           instrument_id: p.instrument_id,
           units: p.units,
         })),
+        is_partial: false,
       };
 
       const result = await api.closeRunPositions(payload);

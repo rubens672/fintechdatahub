@@ -1341,7 +1341,13 @@ LOCAL_INSTRUMENT_MAP = {
 REVERSE_LOCAL_INSTRUMENT_MAP = {v[0]: k for k, v in LOCAL_INSTRUMENT_MAP.items()}
 
 
-async def direct_etoro_close_single_position(position_id: int, instrument_id: Optional[int] = None, units: Optional[float] = None, mode: str = "demo") -> Dict[str, Any]:
+async def direct_etoro_close_single_position(
+    position_id: int, 
+    instrument_id: Optional[int] = None, 
+    units: Optional[float] = None, 
+    mode: str = "demo",
+    is_partial: bool = False,
+) -> Dict[str, Any]:
     """Closes a position directly against eToro Public API with full parameter resolution (InstrumentID)."""
     pub_key = os.getenv("ETORO_PUBLIC_KEY")
     priv_key = os.getenv("ETORO_PRIVATE_KEY")
@@ -1382,7 +1388,9 @@ async def direct_etoro_close_single_position(position_id: int, instrument_id: Op
     if instrument_id:
         body["InstrumentID"] = int(instrument_id)
         body["InstrumentId"] = int(instrument_id)
-    if units and units > 0:
+    # Per eToro OpenAPI spec: "If UnitsToDeduct is omitted or set to null, the full position will be closed."
+    # Supplying UnitsToDeduct triggers the partial close engine, which rejects positions that disallow partial close.
+    if is_partial and units and units > 0:
         body["UnitsToDeduct"] = float(units)
 
     logger.info("Direct eToro close call for position %s (instrument %s) on %s with body %s", position_id, instrument_id, url, body)
@@ -1620,6 +1628,7 @@ async def user_web_etoro_close_run(payload: Dict[str, Any]):
             continue
 
     mode = str(payload.get("mode", "demo"))
+    is_partial = bool(payload.get("is_partial", False))
     requested_pos_ids = payload.get("position_ids") or []
     positions_meta = payload.get("positions_meta") or []
     meta_map = {int(pm["id"]): pm for pm in positions_meta if "id" in pm}
@@ -1645,7 +1654,7 @@ async def user_web_etoro_close_run(payload: Dict[str, Any]):
                     inst_id = REVERSE_LOCAL_INSTRUMENT_MAP.get(sym.replace(".US", "").strip().upper())
 
                 direct_res = await direct_etoro_close_single_position(
-                    pos_id, instrument_id=inst_id, units=units, mode=mode
+                    pos_id, instrument_id=inst_id, units=units if is_partial else None, mode=mode, is_partial=is_partial
                 )
                 if direct_res.get("isSuccess"):
                     total_closed += 1
