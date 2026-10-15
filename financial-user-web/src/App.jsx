@@ -102,6 +102,7 @@ function AppContent({ isCockpit = false }) {
   // eToro Automated Execution State (Cockpit Exclusive)
   const [isEToroModalOpen, setIsEToroModalOpen] = useState(false);
   const [isClosePositionsModalOpen, setIsClosePositionsModalOpen] = useState(false);
+  const [closeModalTarget, setCloseModalTarget] = useState(null);
   const [etoroExecutionReceipt, setEtoroExecutionReceipt] = useState(null);
   const [etoroClosedTrades, setEtoroClosedTrades] = useState([]);
   const [isWhatIfOpen, setIsWhatIfOpen] = useState(false);
@@ -463,6 +464,12 @@ function AppContent({ isCockpit = false }) {
       console.warn('Could not refresh eToro positions:', e);
     }
   }, [runId]);
+
+  const handleOpenCloseModal = useCallback((target = null) => {
+    const isValidTarget = target && typeof target === 'object' && !target._reactName && !target.nativeEvent && (target.symbol || target.id || target.rawPositions);
+    setCloseModalTarget(isValidTarget ? target : null);
+    setIsClosePositionsModalOpen(true);
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -1068,7 +1075,7 @@ function AppContent({ isCockpit = false }) {
                 marketSession={marketSession}
                 onSelectStock={(stock) => setSelectedStock(stock)}
                 isCockpit={isCockpit}
-                onOpenCloseModal={() => setIsClosePositionsModalOpen(true)}
+                onOpenCloseModal={handleOpenCloseModal}
                 viewMode="ACTIVE_ONLY"
               />
 
@@ -1117,7 +1124,7 @@ function AppContent({ isCockpit = false }) {
                   isCockpit={isCockpit}
                   runId={runId}
                   onOpenEToroModal={() => setIsEToroModalOpen(true)}
-                  onOpenCloseModal={() => setIsClosePositionsModalOpen(true)}
+                  onOpenCloseModal={handleOpenCloseModal}
                   hasExecutedOrders={isRunExecutedOnEToro}
                   etoroPositions={etoroPositions}
                 />
@@ -1173,7 +1180,7 @@ function AppContent({ isCockpit = false }) {
               marketSession={marketSession}
               onSelectStock={(stock) => setSelectedStock(stock)}
               isCockpit={isCockpit}
-              onOpenCloseModal={() => setIsClosePositionsModalOpen(true)}
+              onOpenCloseModal={handleOpenCloseModal}
               viewMode="CLOSED_ONLY"
             />
           )}
@@ -1326,9 +1333,15 @@ function AppContent({ isCockpit = false }) {
 
           <EToroClosePositionsModal
             isOpen={isClosePositionsModalOpen}
-            runId={runId}
+            runId={runId || 'ALL'}
             accountMode="demo"
-            onClose={() => setIsClosePositionsModalOpen(false)}
+            targetItem={closeModalTarget}
+            livePositions={etoroPositions}
+            liveOrders={etoroOrders}
+            onClose={() => {
+              setIsClosePositionsModalOpen(false);
+              setCloseModalTarget(null);
+            }}
             onPositionsClosed={(res) => {
               refreshEToroPositions();
             }}

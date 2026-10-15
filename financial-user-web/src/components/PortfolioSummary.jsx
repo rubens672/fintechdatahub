@@ -107,7 +107,7 @@ export function PortfolioSummary({
           {/* Sell / Close Positions Button */}
           <button
             type="button"
-            onClick={onOpenCloseModal}
+            onClick={() => onOpenCloseModal && onOpenCloseModal(null)}
             className="hover:scale-[1.03] active:scale-[0.98]"
             style={{
               display: 'flex',

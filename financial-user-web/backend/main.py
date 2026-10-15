@@ -1478,9 +1478,59 @@ async def user_web_etoro_get_run_active_items(run_id: str, account: str = Query(
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(f"{base}/api/etoro/run-active-items/{run_id}?account={account}")
                 if resp.status_code == 200:
-                    return resp.json()
+                    data = resp.json()
+                    if data.get("items") and len(data["items"]) > 0:
+                        return data
         except Exception:
             continue
+
+    # Fallback to Firestore etoro_state/live_positions
+    try:
+        if workflow_db is not None and workflow_db._db is not None:
+            doc = workflow_db._db.collection("etoro_state").document("live_positions").get()
+            if doc.exists:
+                pos_data = doc.to_dict() or {}
+                raw_positions = pos_data.get("positions") or []
+                items = []
+                total_invested = 0.0
+                total_pnl = 0.0
+                for p in raw_positions:
+                    p_id = p.get("positionId") or p.get("positionID") or p.get("id")
+                    if not p_id:
+                        continue
+                    sym = (p.get("symbol") or p.get("symbolName") or "").replace(".US", "").strip().upper()
+                    invested = float(p.get("invested") or p.get("investment") or 0.0)
+                    pnl = float(p.get("pnl") or p.get("netProfit") or 0.0)
+                    total_invested += invested
+                    total_pnl += pnl
+                    items.append({
+                        "id": p_id,
+                        "item_type": "POSITION",
+                        "symbol": sym,
+                        "name": p.get("name") or sym,
+                        "units": float(p.get("units") or p.get("Units") or 1.0),
+                        "open_rate": float(p.get("openRate") or p.get("OpenRate") or 0.0),
+                        "current_rate": float(p.get("currentRate") or p.get("CurrentRate") or 0.0),
+                        "invested": round(invested, 2),
+                        "pnl": round(pnl, 2),
+                        "pnl_percent": float(p.get("pnlPercent") or 0.0),
+                        "stop_loss": float(p.get("stopLossRate") or p.get("StopLossRate") or 0.0),
+                        "take_profit": float(p.get("takeProfitRate") or p.get("TakeProfitRate") or 0.0),
+                        "instrument_id": p.get("instrumentId") or p.get("InstrumentID"),
+                    })
+                if items:
+                    return {
+                        "run_id": run_id,
+                        "account": account,
+                        "total_active_positions": len(items),
+                        "total_pending_orders": 0,
+                        "total_invested": round(total_invested, 2),
+                        "total_unrealized_pnl": round(total_pnl, 2),
+                        "items": items,
+                    }
+    except Exception as fe:
+        logger.debug("Firestore live_positions fallback error: %s", fe)
+
     return {
         "run_id": run_id,
         "account": account,

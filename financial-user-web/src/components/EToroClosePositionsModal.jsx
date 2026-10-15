@@ -16,6 +16,9 @@ export default function EToroClosePositionsModal({
   isOpen,
   onClose,
   runId,
+  targetItem = null,
+  livePositions = [],
+  liveOrders = [],
   onPositionsClosed,
   accountMode = 'demo',
 }) {
@@ -28,35 +31,143 @@ export default function EToroClosePositionsModal({
   const [closing, setClosing] = useState(false);
   const [closeReport, setCloseReport] = useState(null);
 
-  // Load live open items for this run upon opening
+  // Load live open items for this run or fallback to live broker positions upon opening
   useEffect(() => {
-    if (!isOpen || !runId) return;
+    if (!isOpen) return;
 
     let isMounted = true;
     setLoading(true);
     setError(null);
     setCloseReport(null);
 
-    api.getRunActiveBrokerItems(runId, accountMode)
+    const effectiveRunId = runId || 'ALL';
+
+    const buildFallbackItems = () => {
+      const fbItems = [];
+      if (Array.isArray(livePositions) && livePositions.length > 0) {
+        livePositions.forEach((p) => {
+          const pid = p.position_id || p.positionId || p.PositionID || p.id;
+          if (pid) {
+            const sym = (p.symbol || p.symbolName || '').replace('.US', '').trim().toUpperCase();
+            fbItems.push({
+              id: pid,
+              item_type: 'POSITION',
+              symbol: sym,
+              name: p.name || sym,
+              units: Number(p.units || p.Units || 1),
+              open_rate: Number(p.open_rate || p.openRate || p.OpenRate || 0),
+              current_rate: Number(p.current_rate || p.currentRate || p.CurrentRate || 0),
+              invested: Number(p.invested || p.investment || 0),
+              pnl: Number(p.pnl || p.netProfit || 0),
+              pnl_percent: Number(p.pnl_percent || p.pnlPercent || 0),
+              stop_loss: Number(p.stop_loss || p.stopLossRate || 0),
+              take_profit: Number(p.take_profit || p.takeProfitRate || 0),
+              instrument_id: p.instrumentId || p.InstrumentID,
+            });
+          }
+        });
+      }
+      if (Array.isArray(liveOrders) && liveOrders.length > 0) {
+        liveOrders.forEach((o) => {
+          const oid = o.order_id || o.orderId || o.OrderID || o.id;
+          if (oid) {
+            const sym = (o.symbol || o.symbolName || '').replace('.US', '').trim().toUpperCase();
+            fbItems.push({
+              id: oid,
+              item_type: 'ORDER',
+              symbol: sym,
+              name: o.name || sym,
+              units: Number(o.units || o.Units || 1),
+              open_rate: Number(o.limit_price || o.rate || o.Rate || 0),
+              current_rate: Number(o.current_rate || o.currentRate || 0),
+              invested: Number(o.invested || 0),
+              pnl: 0,
+              pnl_percent: 0,
+              stop_loss: Number(o.stop_loss || 0),
+              take_profit: Number(o.take_profit || 0),
+              instrument_id: o.instrumentId || o.InstrumentID,
+            });
+          }
+        });
+      }
+      return fbItems;
+    };
+
+    const applySelection = (resolvedItems) => {
+      if (targetItem) {
+        const targetSymbol = (targetItem.symbol || targetItem.name || '').replace('.US', '').trim().toUpperCase();
+        const targetIds = new Set();
+        if (targetItem.id) targetIds.add(String(targetItem.id));
+        if (targetItem.position_id) targetIds.add(String(targetItem.position_id));
+        if (targetItem.positionId) targetIds.add(String(targetItem.positionId));
+        if (Array.isArray(targetItem.rawPositions)) {
+          targetItem.rawPositions.forEach((rp) => {
+            const rpid = rp.position_id || rp.positionId || rp.PositionID || rp.id;
+            if (rpid) targetIds.add(String(rpid));
+          });
+        }
+        if (Array.isArray(targetItem.rawOrders)) {
+          targetItem.rawOrders.forEach((ro) => {
+            const roid = ro.order_id || ro.orderId || ro.OrderID || ro.id;
+            if (roid) targetIds.add(String(roid));
+          });
+        }
+
+        const matchedIds = new Set();
+        resolvedItems.forEach((it) => {
+          const itIdStr = String(it.id);
+          const itSym = (it.symbol || '').replace('.US', '').trim().toUpperCase();
+          if (targetIds.has(itIdStr) || (targetSymbol && itSym === targetSymbol)) {
+            matchedIds.add(it.id);
+          }
+        });
+
+        if (matchedIds.size > 0) {
+          setSelectedItemIds(matchedIds);
+        } else if (targetItem.id) {
+          setSelectedItemIds(new Set([targetItem.id]));
+        } else {
+          setSelectedItemIds(new Set(resolvedItems.map((it) => it.id)));
+        }
+      } else {
+        setSelectedItemIds(new Set(resolvedItems.map((it) => it.id)));
+      }
+    };
+
+    api.getRunActiveBrokerItems(effectiveRunId, accountMode)
       .then((data) => {
         if (!isMounted) return;
-        setActiveData(data);
-        // By default select all active items
-        const allIds = new Set((data.items || []).map((it) => it.id));
-        setSelectedItemIds(allIds);
+        let resolvedItems = (data && Array.isArray(data.items)) ? data.items : [];
+
+        // If backend returned empty items, use fallback items from live broker snapshot
+        if (resolvedItems.length === 0) {
+          const fallback = buildFallbackItems();
+          if (fallback.length > 0) {
+            resolvedItems = fallback;
+          }
+        }
+
+        setActiveData({ ...(data || {}), items: resolvedItems });
+        applySelection(resolvedItems);
         setLoading(false);
       })
       .catch((err) => {
         if (!isMounted) return;
-        console.error('Error loading active broker items:', err);
-        setError(err.message || 'Errore nel recupero delle posizioni aperte su eToro');
+        console.warn('Backend getRunActiveBrokerItems warning, using client fallback:', err);
+        const fallback = buildFallbackItems();
+        if (fallback.length > 0) {
+          setActiveData({ items: fallback });
+          applySelection(fallback);
+        } else {
+          setError(err.message || 'Errore nel recupero delle posizioni aperte su eToro');
+        }
         setLoading(false);
       });
 
     return () => {
       isMounted = false;
     };
-  }, [isOpen, runId, accountMode]);
+  }, [isOpen, runId, accountMode, targetItem, livePositions, liveOrders]);
 
   const items = activeData?.items || [];
   const positions = items.filter((i) => i.item_type === 'POSITION');
@@ -93,7 +204,7 @@ export default function EToroClosePositionsModal({
 
     try {
       const payload = {
-        run_id: runId,
+        run_id: runId || 'ALL',
         mode: accountMode,
         position_ids: posIds.length > 0 ? posIds : null,
         order_ids: ordIds.length > 0 ? ordIds : null,
@@ -145,14 +256,20 @@ export default function EToroClosePositionsModal({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', margin: 0 }}>
-                  CHIUSURA POSIZIONI & ORDINI RUN
+                  {targetItem?.symbol 
+                    ? `CHIUSURA POSIZIONE ${targetItem.symbol.toUpperCase()}` 
+                    : 'CHIUSURA POSIZIONI & ORDINI RUN'}
                 </h2>
                 <span style={{ fontSize: '11px', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.4)', padding: '2px 8px', borderRadius: '999px', fontWeight: 700, textTransform: 'uppercase' }}>
                   {accountMode.toUpperCase()}
                 </span>
               </div>
               <div style={{ color: 'var(--text-muted, #94a3b8)', fontSize: '13px', marginTop: '4px' }}>
-                Run quantitativo: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--cyan-primary, #06b6d4)', fontWeight: 600 }}>{runId}</span>
+                {targetItem?.symbol ? (
+                  <span>Liquidazione selettiva a mercato per <strong style={{ color: '#38bdf8' }}>{targetItem.symbol}</strong> su conto eToro</span>
+                ) : (
+                  <>Run quantitativo: <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--cyan-primary, #06b6d4)', fontWeight: 600 }}>{runId || 'PORTAFOGLIO ATTIVO'}</span></>
+                )}
               </div>
             </div>
           </div>
@@ -527,7 +644,9 @@ export default function EToroClosePositionsModal({
               ) : (
                 <>
                   <span>🔴</span>
-                  <span>Conferma Chiusura a Mercato ({selectedItemIds.size})</span>
+                  <span>
+                    Conferma Chiusura a Mercato {targetItem?.symbol ? `(${targetItem.symbol})` : `(${selectedItemIds.size})`}
+                  </span>
                 </>
               )}
             </button>

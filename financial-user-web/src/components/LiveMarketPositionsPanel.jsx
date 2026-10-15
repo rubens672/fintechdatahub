@@ -438,6 +438,7 @@ export function LiveMarketPositionsPanel({
         tranchesCount: positions.length || orders.length || 1,
         rawStock: s,
         rawPositions: positions,
+        rawOrders: orders,
       });
     });
 
@@ -924,7 +925,7 @@ export function LiveMarketPositionsPanel({
           {isCockpit && onOpenCloseModal && activeMarketPositions.length > 0 && (
             <button
               type="button"
-              onClick={onOpenCloseModal}
+              onClick={() => onOpenCloseModal && onOpenCloseModal(null)}
               className="hover:scale-[1.02] active:scale-[0.98]"
               style={{
                 display: 'flex',
@@ -1129,7 +1130,7 @@ export function LiveMarketPositionsPanel({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onOpenCloseModal();
+                              onOpenCloseModal(p);
                             }}
                             className="hover:scale-[1.03] active:scale-[0.97]"
                             style={{
@@ -1386,7 +1387,7 @@ export function LiveMarketPositionsPanel({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onOpenCloseModal();
+                        onOpenCloseModal(p);
                       }}
                       className="hover:scale-[1.02] active:scale-[0.98]"
                       style={{
