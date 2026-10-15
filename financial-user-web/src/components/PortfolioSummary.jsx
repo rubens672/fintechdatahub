@@ -101,7 +101,7 @@ export function PortfolioSummary({
             title="Apri pannello pre-flight ed invia gli ordini MIT selezionati al conto Demo eToro"
           >
             <Send size={16} color="#000" />
-            <span>⚡ Invia a eToro (Demo)</span>
+            <span>⚡ Scelta Titoli & Invio eToro</span>
           </button>
 
           {/* Sell / Close Positions Button */}

@@ -303,8 +303,8 @@ function AppContent({ isCockpit = false }) {
           isPendingOrder: true,
           orders: orders,
         });
-      } else if (!isRunExecutedOnEToro) {
-        // Run has never been executed yet on eToro: show initial proposed candidates
+      } else {
+        // Candidate proposed by current screening run - always included regardless of whether other stocks are already in the market
         const liveData = livePrices ? (livePrices[sym] || livePrices[`${sym}.US`]) : null;
         const livePriceVal = typeof liveData === 'number'
           ? liveData
@@ -322,7 +322,6 @@ function AppContent({ isCockpit = false }) {
           isPendingOrder: false,
         });
       }
-      // If the run was executed, but this stock has no position and no pending order: it is revoked/cancelled, omitted.
     });
 
     // 2. Append any preexisting open broker positions (like TSM) that are NOT in topStocks
@@ -412,9 +411,6 @@ function AppContent({ isCockpit = false }) {
       });
     });
 
-    if (isRunExecutedOnEToro) {
-      return list;
-    }
     return list.length > 0 ? list : (topStocks || []);
   }, [etoroPositions, etoroOrders, isRunExecutedOnEToro, topStocks, runsList, livePrices]);
 
@@ -562,27 +558,10 @@ function AppContent({ isCockpit = false }) {
         setRunsList(cleanRuns);
       }
 
-      // Check if any historical run matches the live eToro positions
-      let runToDisplay = latestRun;
-      if (etoroData?.positions?.length > 0 && cleanRuns.length > 0) {
-        const etoroSyms = etoroData.positions.map((p) => (p?.symbol || '').replace('.US', '').toUpperCase());
-        const matchingRun = cleanRuns.find((r) => {
-          const runSyms = (r?.results || []).map((s) => (s?.symbol || '').toUpperCase());
-          const common = etoroSyms.filter((s) => runSyms.includes(s));
-          return common.length >= 3;
-        });
-        if (matchingRun && Array.isArray(matchingRun.results) && matchingRun.results.length > 0) {
-          runToDisplay = matchingRun;
-        }
-      }
-
-      // If runToDisplay has no results, fallback to the latest run with results
-      if ((!runToDisplay || !runToDisplay.results || runToDisplay.results.length === 0) && cleanRuns.length > 0) {
-        const validWithResults = cleanRuns.find((r) => Array.isArray(r.results) && r.results.length > 0);
-        if (validWithResults) {
-          runToDisplay = validWithResults;
-        }
-      }
+      // Prioritize the latest completed run with results
+      let runToDisplay = (latestRun && Array.isArray(latestRun.results) && latestRun.results.length > 0)
+        ? latestRun
+        : (cleanRuns.find((r) => Array.isArray(r.results) && r.results.length > 0) || latestRun);
 
       if (runToDisplay && runToDisplay.run_id) {
         setRunId(runToDisplay.run_id);
@@ -812,7 +791,10 @@ function AppContent({ isCockpit = false }) {
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
         try {
           const statusRes = await api.getWorkflowRunStatus(bgRunId);
-          if (statusRes?.status === 'COMPLETED' || statusRes?.status === 'FAILED') {
+          if (statusRes?.status === 'FAILED') {
+            return statusRes;
+          }
+          if (statusRes?.status === 'COMPLETED' && Array.isArray(statusRes?.results) && statusRes.results.length > 0) {
             return statusRes;
           }
         } catch (_pollErr) {
@@ -842,13 +824,40 @@ function AppContent({ isCockpit = false }) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       setExecutionTime(elapsed);
       setRawWorkflowResult(response?.raw_result || response);
-      setTopStocks(response?.results || []);
+      let finalResults = response?.results || [];
+
+      // Fallback: if response.results is empty, query getWorkflowStatus directly
+      if (!Array.isArray(finalResults) || finalResults.length === 0) {
+        try {
+          const detailedStatus = await api.getWorkflowStatus(bgRunId);
+          if (Array.isArray(detailedStatus?.results) && detailedStatus.results.length > 0) {
+            finalResults = detailedStatus.results;
+            setRawWorkflowResult(detailedStatus?.raw_result || detailedStatus);
+          }
+        } catch (_fallbackErr) {
+          // continue
+        }
+      }
+
+      setTopStocks(finalResults);
       setEtoroExecutionReceipt(null);
 
       // Refresh runs list and quant audit
       try {
         const updatedRuns = await api.getWorkflowRuns(20);
-        if (updatedRuns && updatedRuns.runs) setRunsList(updatedRuns.runs);
+        if (updatedRuns && updatedRuns.runs) {
+          const cleanRuns = updatedRuns.runs.filter(
+            (r) => r.run_id && !r.run_id.startsWith('test_') && !r.run_id.startsWith('run_20260901_183112') && !r.run_id.startsWith('run_20260911_234915')
+          );
+          setRunsList(cleanRuns);
+          if (finalResults.length === 0) {
+            const foundCurrent = cleanRuns.find((r) => r.run_id === bgRunId && Array.isArray(r.results) && r.results.length > 0);
+            if (foundCurrent) {
+              setTopStocks(foundCurrent.results);
+              setRawWorkflowResult(foundCurrent.raw_result || foundCurrent);
+            }
+          }
+        }
       } catch (e) {
         console.warn('Error refreshing runs list:', e);
       }
@@ -1097,6 +1106,7 @@ function AppContent({ isCockpit = false }) {
                 isRunning={isRunning}
                 onRunWorkflow={handleRunWorkflow}
                 onOpenHealthModal={() => setIsHealthModalOpen(true)}
+                onOpenEToroModal={() => setIsEToroModalOpen(true)}
                 etoroPositions={etoroPositions}
                 etoroExecutionReceipt={etoroExecutionReceipt}
               />

@@ -28,7 +28,7 @@ export function EToroExecutionModal({ isOpen, runId, onClose, onExecutionComplet
   }, [runId]);
 
   const loadPreflight = async () => {
-    if (!runId || !runId.startsWith('run_20')) {
+    if (!runId || typeof runId !== 'string' || !runId.trim()) {
       setLoadingPreflight(false);
       setError(`ID Run non valido ("${runId || 'nessuno'}"). Seleziona una run completata dal menu in alto o attendi il completamento del workflow.`);
       return;

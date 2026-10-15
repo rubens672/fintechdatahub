@@ -18,6 +18,7 @@ export function ControlPanel({
   isRunning = false,
   onRunWorkflow,
   onOpenHealthModal,
+  onOpenEToroModal,
   etoroPositions = [],
   etoroExecutionReceipt = null,
 }) {
@@ -167,6 +168,36 @@ export function ControlPanel({
                 </>
               )}
             </button>
+
+            {/* Feature: Pulsante Scelta Titoli & Invio eToro (Sempre visibile e accessibile) */}
+            {onOpenEToroModal && (
+              <button
+                type="button"
+                onClick={onOpenEToroModal}
+                disabled={isRunning}
+                title="Apri il pannello di selezione dei titoli quantitativi ed invia gli ordini a eToro"
+                className="hover:scale-[1.02] active:scale-[0.98]"
+                style={{
+                  padding: '8px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: isRunning ? 'not-allowed' : 'pointer',
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)',
+                  color: '#000',
+                  boxShadow: '0 2px 12px rgba(6, 182, 212, 0.35)',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  opacity: isRunning ? 0.6 : 1,
+                }}
+              >
+                <Zap size={16} color="#000" fill="#000" />
+                <span>Scelta Titoli & Invio eToro</span>
+              </button>
+            )}
           </div>
 
           {/* Titolo Sezione e Badge Modalità a destra */}

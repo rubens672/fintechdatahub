@@ -489,10 +489,17 @@ async def get_workflow_status(run_id: str):
             if run_doc:
                 meta = run_doc.get("metadata", {}) or {}
                 formatted_results = _extract_and_format_results(run_doc)
+                raw_status = meta.get("status") or run_doc.get("status")
+                if raw_status == "FAILED":
+                    status = "FAILED"
+                elif formatted_results and len(formatted_results) > 0:
+                    status = "COMPLETED"
+                else:
+                    status = "RUNNING"
 
                 return {
                     "run_id": run_id,
-                    "status": run_doc.get("status", "COMPLETED"),
+                    "status": status,
                     "execution_time": meta.get("execution_time") or run_doc.get("execution_time") or 4.8,
                     "capital": meta.get("capital", 10000.0),
                     "top_n": meta.get("top_n", 5),
