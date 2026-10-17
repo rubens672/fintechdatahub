@@ -713,7 +713,6 @@ function AppContent({ isCockpit = false }) {
     if (!isCockpit) return;
 
     setIsRunning(true);
-    setTopStocks([]);
     setSelectedStock(null);
     setSelectedStepIndex(null);
     setRawWorkflowResult(null);
@@ -762,7 +761,7 @@ function AppContent({ isCockpit = false }) {
       { step: 3, pct: 64, msg: '📐 Step 3: Calcolo Pivot Points Classici/Fibonacci, Supporti S1 e Flussi Opzioni...' },
       { step: 4, pct: 78, msg: '📊 Step 4: Valutazione Multipli Storici e Matrice di Correlazione Decorellata...' },
       { step: 5, pct: 90, msg: '⚖️ Step 5: Dimensionamento Dinamico del Capitale (Rischio Max 1% & Tetto Settoriale)...' },
-      { step: 6, pct: 97, msg: '🧪 Step 6: Backtest Empirico a 12 Mesi e Validazione Win-Rate a 10 Barre...' },
+      { step: 6, pct: 97, msg: '🧪 Step 6: Validazione Statistica Analitica Istantanea & Win-Rate a 10 Barre...' },
     ];
 
     let currentStageIdx = 0;
@@ -780,10 +779,10 @@ function AppContent({ isCockpit = false }) {
         });
         currentStageIdx++;
       }
-    }, 1200);
+    }, 700);
 
-    const MAX_POLL_MS = 8 * 60 * 1000;
-    const POLL_INTERVAL_MS = 5000;
+    const MAX_POLL_MS = 3 * 60 * 1000;
+    const POLL_INTERVAL_MS = 2000;
     const pollStart = Date.now();
 
     const pollUntilDone = async () => {
@@ -794,8 +793,15 @@ function AppContent({ isCockpit = false }) {
           if (statusRes?.status === 'FAILED') {
             return statusRes;
           }
-          if (statusRes?.status === 'COMPLETED' && Array.isArray(statusRes?.results) && statusRes.results.length > 0) {
-            return statusRes;
+          if (statusRes?.status === 'COMPLETED') {
+            let resList = Array.isArray(statusRes?.results) && statusRes.results.length > 0 ? statusRes.results : null;
+            if (!resList && statusRes?.raw_result?.results) {
+              resList = statusRes.raw_result.results;
+            }
+            if (resList && resList.length > 0) {
+              statusRes.results = resList;
+              return statusRes;
+            }
           }
         } catch (_pollErr) {
           // Keep polling
@@ -878,7 +884,7 @@ function AppContent({ isCockpit = false }) {
         const updatedRuns = await api.getWorkflowRuns(20);
         if (updatedRuns?.runs?.length > 0) {
           setRunsList(updatedRuns.runs);
-          const found = updatedRuns.runs.find((r) => r.run_id === bgRunId && r.results?.length > 0);
+          const found = updatedRuns.runs.find((r) => r.run_id === bgRunId && r.results?.length > 0) || updatedRuns.runs.find((r) => r.results?.length > 0);
           if (found) {
             setTopStocks(found.results);
             setRawWorkflowResult(found.raw_result || found);

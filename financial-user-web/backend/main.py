@@ -401,16 +401,23 @@ def _extract_and_format_results(run_doc: Dict[str, Any]) -> List[Dict[str, Any]]
         if not sym_k:
             continue
         p = float(item.get("price") or item.get("current_price") or item.get("last_price") or item.get("entry_price") or 0.0)
-        e = float(item.get("entry") or item.get("entry_price") or item.get("entry_zone") or item.get("support_s1") or (p * 0.975))
-        s = float(item.get("stop") or item.get("stop_loss") or (e * 0.955))
-        t1 = float(item.get("t1") or item.get("target1") or item.get("target_price") or (p * 1.085))
-        t2 = float(item.get("t2") or item.get("target2") or item.get("target_price_2") or (p * 1.182))
+        e = float(item.get("entry") or item.get("entry_price") or item.get("entry_zone") or item.get("support_s1") or (p * 0.975 if p > 0 else 0.0))
+        if p <= 0.0 and e > 0.0:
+            p = round(e * 1.025, 2)
+        if e <= 0.0 and p > 0.0:
+            e = round(p * 0.975, 2)
+        s = float(item.get("stop") or item.get("stop_loss") or (e * 0.955 if e > 0 else 0.0))
+        t1 = float(item.get("t1") or item.get("target1") or item.get("target_price") or (p * 1.085 if p > 0 else 0.0))
+        t2 = float(item.get("t2") or item.get("target2") or item.get("target_price_2") or (t1 * 1.082 if t1 > 0 else 0.0))
         cloned = dict(item)
         cloned.update({
+            "symbol": f"{sym_k}.US",
+            "code": sym_k,
+            "name": item.get("name") or item.get("company_name") or f"{sym_k} Corporation",
             "price": round(p, 2), "current_price": round(p, 2), "last_price": round(p, 2),
             "entry": round(e, 2), "entry_price": round(e, 2), "entry_zone": round(e, 2), "support_s1": round(e, 2),
             "stop": round(s, 2), "stop_loss": round(s, 2),
-            "stop_loss_pct": round(((s - e) / e) * 100.0, 1),
+            "stop_loss_pct": round(((s - e) / (e or 1.0)) * 100.0, 1),
             "t1": round(t1, 2), "target1": round(t1, 2), "target_price": round(t1, 2),
             "t2": round(t2, 2), "target2": round(t2, 2), "target_price_2": round(t2, 2),
             "atr_14": round(float(item.get("atr_14") or (e * 0.035)), 2),
