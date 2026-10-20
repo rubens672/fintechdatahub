@@ -90,44 +90,44 @@ graph TD
 
 ---
 
-## 4. Logica Quantitativa: Dual-Tranche Order Splitting
+## 4. Logica Quantitativa: Ordine Unico Adattivo (`FULL`) & Calibrazione Dinamica MIT vs MKT
 
-Poiché l'API di eToro accetta un solo `takeProfitRate` per ordine e il nostro DAG calcola due target asimmetrici (**Target 1 a R1** e **Target 2 esteso**):
+L'architettura iniziale a 2 tranche sdoppiate è stata superata e consolidata in un **unico ordine compatto (`FULL`) per candidato**, eliminando la frammentazione delle quote e gestendo la presa di profitto e la protezione del capitale attraverso una combinazione di:
+1. **Take Profit Adattivo al Regime e Profilo di Trend**
+2. **Dynamic Trailing Lock-In Ratchet (Break-Even Guardian)**
+3. **Calibrazione Realistica dell'Ingresso MIT vs MKT sull'ATR reale del titolo**
 
 ```
-                        Dossier Titolo Quantitativo
-                          (es. NVDA: 10 azioni)
-                                    │
-           ┌────────────────────────┴────────────────────────┐
-           ▼                                                 ▼
-       Tranche 1 (50%)                                   Tranche 2 (50%)
-    5 azioni @ Entry S1                               5 azioni @ Entry S1
-    Stop Loss: S1 - 2.2×ATR                           Stop Loss: S1 - 2.2×ATR
-    Take Profit: Target 1 (+1.5R)                     Take Profit: Target 2 (+3.0R)
-    (Scale-out 50% + Break-Even Trigger)              (Runner / Massimizzazione Alpha)
+                       Dossier Titolo Quantitativo
+                                   │
+              ┌────────────────────┴────────────────────┐
+              ▼                                         ▼
+   Titoli SUPER_TREND                        Titoli NO_SUPER_TREND (Swing)
+  100% Quote @ MKT                          100% Quote @ MIT o MKT
+  Take Profit: None (Uncapped Runner)       Take Profit: Target 2 (+3.0R)
+  Protezione: Trailing Ratchet              Protezione: Trailing Ratchet
 ```
 
-### Regole di Assegnazione Quote:
-* **Quote Pari (es. 10 azioni)**: 5 quote a Tranche 1 (T1) + 5 quote a Tranche 2 (T2).
-* **Quote Dispari (es. 9 azioni)**:
-  * Tranche 1: `(quote + 1) // 2` = 5 quote (priorità alla certezza del primo target).
-  * Tranche 2: `quote - tranche1` = 4 quote.
-* **Quota Singola (1 sola azione)**: 0 quote a Tranche 1, 1 quota a Tranche 2 (profilo di massimo rendimento).
-* **Strategia Single Target (Opzionale)**: Se selezionata dall'utente nel modale, invia un unico ordine con il 100% delle quote puntato su Target 2.
+### Regole di Selezione Tipologia d'Ordine (MIT vs MKT basata su ATR):
+Per eliminare il problema di ordini pendenti irrealistici su titoli a bassa volatilità (es. COST con ritracciamento di $30 non raggiungibile in 1 seduta), il motore adotta la seguente verifica quantitativa:
+* **Condizione MIT (Limit su Supporto S1)**:
+  $$\text{Distanza da } S_1 \le (0.75 \times \text{ATR}_{14}) \quad \text{E} \quad \frac{S_1}{P_{\text{current}}} \ge 0.975$$
+  *Applicata solo* se il timing tecnico è `FAVORABLE_NEAR_SUPPORT`, il titolo non è `SUPER_TREND` e il mercato non è `RISK_OFF`.
+* **Fallback Automatico a Market (MKT)**:
+  Se la distanza da $S_1$ supera $0.75 \times \text{ATR}_{14}$ o se il titolo presenta momentum conclamato (`SUPER_TREND` o `MOMENTUM_BREAKOUT`), l'ordine viene immesso a mercato (`MKT`) al prezzo corrente per eliminare il fenomeno di *Adverse Selection* ed evitare ordini stantii.
 
-### Struttura Payload Ordine MIT inviato a eToro:
+### Struttura Payload Ordine Unificato inviato a eToro:
 ```json
 {
   "action": "open",
   "transaction": "buy",
-  "symbol": "NVDA",
-  "orderType": "mit",
-  "triggerRate": 118.50,
-  "units": 5.0,
+  "symbol": "COST",
+  "orderType": "mkt",
+  "triggerRate": 0.0,
+  "units": 2.0,
   "leverage": 1,
-  "orderCurrency": "usd",
-  "stopLossRate": 113.17,
-  "takeProfitRate": 128.57,
+  "stopLossRate": 927.94,
+  "takeProfitRate": 1185.98,
   "stopLossType": "fixed"
 }
 ```
